@@ -1,0 +1,15 @@
+# Compilación de .NET
+bin/
+obj/
+
+# Configuración local de IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
