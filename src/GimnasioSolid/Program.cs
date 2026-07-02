@@ -64,25 +64,26 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
 
 app.MapGet("/access", () => Results.Content(PageLayout("Validación de acceso", "<a class=\"button\" href=\"/\">Menú principal</a>", "<h2>Validación de acceso</h2><p>Valida el ingreso de un miembro usando su credencial guardada. Elige el tipo de lector y presenta el dato correspondiente.</p><section class=\"info-box\"><strong>Cómo funciona:</strong><ul><li>Para <strong>QR</strong>: ingresa el valor exacto de <strong>QR acceso</strong> del miembro.</li><li>Para <strong>Huella</strong>: ingresa el valor de <strong>Huella</strong>. No importa si lo escribes en minúsculas.</li><li>El sistema busca el miembro y verifica si la credencial coincide con sus datos.</li></ul></section><form method=\"post\" action=\"/access\"><label>Datos presentados:<input name=\"presentedData\" required /></label><label>Lector:<select name=\"scanner\"><option value=\"qr\">QR</option><option value=\"fingerprint\">Huella</option></select></label><button type=\"submit\">Validar acceso</button></form>"), "text/html"));
 
-app.MapPost("/access", async (HttpRequest request, TurnstileController turnstile, AccessControl accessControl) =>
+app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo) =>
 {
     var form = await request.ReadFormAsync();
     var presentedData = form["presentedData"].ToString();
     var scanner = form["scanner"].ToString();
 
-    if (scanner == "qr")
-    {
-        accessControl.SetScanner(new QrCodeScanner());
-    }
-    else
-    {
-        accessControl.SetScanner(new FingerprintScanner());
-    }
+    var member = repo.GetAll()
+        .FirstOrDefault(m =>
+            scanner == "qr"
+                ? m.AccessKey == presentedData
+                : m.Fingerprint == presentedData
+        );
 
-    var allowed = turnstile.ValidateEntry(presentedData);
+    var allowed = accessControl.CanOpenDoor(member, presentedData);
+
     var message = allowed ? "Acceso permitido" : "Acceso denegado";
-    var content = $"<h2>Resultado de acceso</h2><p>{message}</p><p><a href=\"/access\">Probar otro acceso</a></p>";
-    return Results.Content(PageLayout("Validación de acceso", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
+
+    return Results.Content(
+        PageLayout("Acceso", "<a href='/access'>Volver</a>", $"<h2>{message}</h2>"),
+        "text/html");
 });
 
 app.MapGet("/billing", (IMemberRepository members, IPaymentRepository payments, BillingService billingService) =>
