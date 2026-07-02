@@ -70,11 +70,19 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
     var presentedData = form["presentedData"].ToString();
     var scanner = form["scanner"].ToString();
 
+    accessControl.SetScanner(scanner == "fingerprint"
+        ? new FingerprintScanner()
+        : new QrCodeScanner());
+
+    var scannedCredential = scanner == "fingerprint"
+        ? new FingerprintScanner().Scan(presentedData)
+        : new QrCodeScanner().Scan(presentedData);
+
     var member = repo.GetAll()
         .FirstOrDefault(m =>
             scanner == "qr"
-                ? m.AccessKey == presentedData
-                : m.Fingerprint == presentedData
+                ? m.AccessKey == scannedCredential
+                : m.FingerprintSignature == scannedCredential
         );
 
     var allowed = accessControl.CanOpenDoor(member, presentedData);
