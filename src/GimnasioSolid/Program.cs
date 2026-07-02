@@ -104,42 +104,44 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
     return Results.Redirect("/members");
 });
 
-app.MapGet("/access", (IAccessLogRepository accessLogs) =>
+app.MapGet("/access", (IMemberRepository members, IAccessLogRepository accessLogs) =>
 {
-    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll())), "text/html");
+    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
 });
 
 app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
 {
     var form = await request.ReadFormAsync();
-    var presentedData = form["presentedData"].ToString();
-    var scanner = form["scanner"].ToString();
-    var scannerName = scanner == "fingerprint" ? "Huella" : "QR";
-    IAccessScanner activeScanner = scanner == "fingerprint"
+    var readerOutput = form["readerOutput"].ToString();
+    var readerType = form["readerType"].ToString();
+    var readerName = readerType == "fingerprint" ? "Huella biométrica" : "Código QR";
+    IAccessScanner activeScanner = readerType == "fingerprint"
         ? new FingerprintScanner()
         : new QrCodeScanner();
 
     accessControl.SetScanner(activeScanner);
-    var scannedCredential = activeScanner.Scan(presentedData);
+    var normalizedCredential = activeScanner.Scan(readerOutput);
 
     var member = repo.GetAll()
         .FirstOrDefault(m =>
-            scanner == "qr"
-                ? m.AccessKey == scannedCredential
-                : m.FingerprintSignature == scannedCredential
+            readerType == "qr"
+                ? m.AccessKey == normalizedCredential
+                : m.FingerprintSignature == normalizedCredential
         );
 
-    var allowed = accessControl.CanOpenDoor(member, presentedData);
-    accessLogs.Save(new AccessLog(member?.Id, member?.Name, DateTime.Now, allowed, scannerName, presentedData));
+    var allowed = accessControl.CanOpenDoor(member, readerOutput);
+    accessLogs.Save(new AccessLog(member?.Id, member?.Name, DateTime.Now, allowed, readerName, readerOutput));
 
     var result =
         "<section class=\"result-panel " + (allowed ? "allowed" : "denied") + "\">" +
         "<span class=\"status-dot\"></span>" +
         "<div><h2>" + (allowed ? "Acceso permitido" : "Acceso denegado") + "</h2>" +
-        "<p>" + (allowed ? $"Bienvenido, {Enc(member?.Name ?? "miembro")}." : "No se encontró una credencial válida para abrir la puerta.") + "</p></div>" +
+        "<p>" + (allowed
+            ? $"El lector {Enc(readerName)} devolvió una credencial válida para {Enc(member?.Name ?? "miembro")}."
+            : $"El lector {Enc(readerName)} devolvió una credencial que no coincide con ningún socio activo.") + "</p></div>" +
         "</section>";
 
-    return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), false)), "text/html");
+    return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), repo.GetAll(), false)), "text/html");
 });
 
 app.MapGet("/billing", (IMemberRepository members, IPaymentRepository payments, BillingService billingService) =>
@@ -211,9 +213,25 @@ app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository member
 
 app.Run();
 
-static string RenderAccessPage(IEnumerable<AccessLog> logs, bool includeHeading = true)
+static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> members, bool includeHeading = true)
 {
     var rows = new StringBuilder();
+    var exampleRows = new StringBuilder();
+
+    foreach (var member in members.OrderBy(member => member.Name))
+    {
+        exampleRows.Append("<tr>");
+        exampleRows.Append($"<td>{Enc(member.Name)}</td>");
+        exampleRows.Append($"<td><code>{Enc(member.AccessKey)}</code></td>");
+        exampleRows.Append($"<td><code>{Enc(member.FingerprintSignature)}</code></td>");
+        exampleRows.Append("</tr>");
+    }
+
+    if (exampleRows.Length == 0)
+    {
+        exampleRows.Append("<tr><td colspan=\"3\" class=\"empty-state\">No hay socios para simular credenciales.</td></tr>");
+    }
+
     foreach (var log in logs.OrderByDescending(log => log.Timestamp).Take(8))
     {
         rows.Append("<tr>");
@@ -230,17 +248,19 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, bool includeHeading 
     }
 
     var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Control de puerta</span><h2>Validación de acceso</h2><p>Elige el lector, ingresa la credencial y confirma si el socio puede ingresar.</p></section>"
+        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Prototipo de lectores</span><h2>Validación de acceso</h2><p>Esta pantalla simula lo que devolvería un lector físico: una cámara QR entrega un código y un lector biométrico entrega una firma interna de huella.</p></section>"
         : string.Empty;
 
     return heading +
+        "<section class=\"panel simulation-note\"><h3>Cómo se interpreta este prototipo</h3><p>No se captura una huella real ni se abre la cámara. Para probar el flujo, escribe la salida simulada del dispositivo: por ejemplo, un QR puede devolver <code>A100</code> y el lector biométrico puede devolver <code>FP-A100</code>.</p></section>" +
         "<section class=\"content-grid two-columns\">" +
-        "<article class=\"panel\"><h3>Nueva validación</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
-        "<label>Datos presentados<input name=\"presentedData\" required placeholder=\"Código QR o huella\" /></label>" +
-        "<label>Lector<select name=\"scanner\"><option value=\"qr\">QR</option><option value=\"fingerprint\">Huella</option></select></label>" +
+        "<article class=\"panel\"><h3>Simular lectura</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
+        "<label>Salida del lector<input name=\"readerOutput\" required placeholder=\"Ej. A100 o FP-A100\" /></label>" +
+        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Cámara / lector QR</option><option value=\"fingerprint\">Lector biométrico de huella</option></select></label>" +
         "<button type=\"submit\">Validar acceso</button></form></article>" +
-        "<article class=\"panel wide\"><h3>Historial reciente</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Lector</th><th>Estado</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
-        "</section>";
+        "<article class=\"panel wide\"><h3>Credenciales simuladas</h3><div class=\"table-wrap\"><table class=\"data-table compact-table\"><thead><tr><th>Socio</th><th>Salida QR</th><th>Salida huella</th></tr></thead><tbody>" + exampleRows + "</tbody></table></div></article>" +
+        "</section>" +
+        "<section class=\"panel\"><h3>Historial reciente</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Lector</th><th>Estado</th></tr></thead><tbody>" + rows + "</tbody></table></div></section>";
 }
 
 static string PageLayout(string title, string activeSection, string content)
@@ -513,6 +533,18 @@ static string CssStyles()
             font-weight: 700;
         }
 
+        .simulation-note {
+            margin-top: 18px;
+            border-left: 5px solid var(--accent);
+            background: #fffaf1;
+        }
+
+        .simulation-note p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
         .stacked-form {
             display: grid;
             gap: 14px;
@@ -557,6 +589,10 @@ static string CssStyles()
             font-size: .94rem;
         }
 
+        .compact-table {
+            min-width: 480px;
+        }
+
         .data-table th,
         .data-table td {
             padding: 13px 14px;
@@ -572,6 +608,19 @@ static string CssStyles()
         }
 
         .data-table tr:last-child td { border-bottom: 0; }
+
+        code {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            padding: 0 8px;
+            border-radius: 6px;
+            background: #edf2f7;
+            color: var(--brand-dark);
+            font-family: Consolas, "Courier New", monospace;
+            font-size: .88rem;
+            font-weight: 700;
+        }
 
         .badge {
             display: inline-flex;
