@@ -111,6 +111,29 @@ app.MapGet("/billing", (IMemberRepository members, IPaymentRepository payments, 
     return Results.Content(PageLayout("Facturación y reportes", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
 });
 
+app.MapGet("/access/qr", (string presentedData, IMemberRepository repo, AccessControl accessControl) =>
+{
+    var member = repo.GetAll()
+        .FirstOrDefault(m => m.AccessKey == presentedData);
+
+    if (member is null)
+    {
+        return Results.Content(PageLayout("QR", "<a href='/access'>Volver</a>", "<h2>❌ QR inválido</h2>"), "text/html");
+    }
+
+    var allowed = accessControl.CanOpenDoor(member, presentedData);
+
+    var message = allowed ? "✅ Acceso permitido por QR" : "❌ Acceso denegado";
+
+    return Results.Content(
+        PageLayout("QR Access", "<a href='/access'>Volver</a>", $"<h2>{message}</h2>"),
+        "text/html"
+    );
+});
+
+
+
+
 app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository members, BillingService billingService) =>
 {
     var form = await request.ReadFormAsync();
