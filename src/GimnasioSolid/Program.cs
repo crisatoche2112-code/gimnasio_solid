@@ -252,7 +252,6 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> 
         : string.Empty;
 
     return heading +
-        "<section class=\"panel simulation-note\"><h3>Cómo se interpreta este prototipo</h3><p>No se captura una huella real ni se abre la cámara. Para probar el flujo, escribe la salida simulada del dispositivo: por ejemplo, un QR puede devolver <code>A100</code> y el lector biométrico puede devolver <code>FP-A100</code>.</p></section>" +
         "<section class=\"content-grid two-columns\">" +
         "<article class=\"panel\"><h3>Simular lectura</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
         "<label>Salida del lector<input name=\"readerOutput\" required placeholder=\"Ej. A100 o FP-A100\" /></label>" +
