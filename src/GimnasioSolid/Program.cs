@@ -38,7 +38,7 @@ app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccess
         "</section>" +
         "<section class=\"content-grid\">" +
         "<article class=\"panel\"><h3>Operaciones rápidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a></div></article>" +
-        "<article class=\"panel\"><h3>Planes disponibles</h3><div class=\"plan-list\"><span>Estudiante · $25.00</span><span>Regular · $40.00</span><span>VIP · $55.00</span><span>Fin de semana · $20.00</span></div></article>" +
+        "<article class=\"panel\"><h3>Planes disponibles</h3><div class=\"plan-list\"><span>Estudiante · S/25.00</span><span>Regular · S/40.00</span><span>VIP · S/55.00</span><span>Fin de semana · S/20.00</span></div></article>" +
         "</section>";
 
     return Results.Content(PageLayout("Panel principal", "home", content), "text/html");
@@ -248,7 +248,7 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> 
     }
 
     var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Prototipo de lectores</span><h2>Validación de acceso</h2><p>Esta pantalla simula lo que devolvería un lector físico: una cámara QR entrega un código y un lector biométrico entrega una firma interna de huella.</p></section>"
+        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Prototipo de lectores</span><h2>Validación de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
         : string.Empty;
 
     return heading +
@@ -738,7 +738,7 @@ static string PlanDisplayName(IMembershipPlan plan)
 
 static string Money(decimal amount)
 {
-    return $"${amount:0.00}";
+    return $"S/{amount:0.00}";
 }
 
 static string Enc(string value)
