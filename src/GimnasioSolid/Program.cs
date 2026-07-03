@@ -1,4 +1,5 @@
 using System.Text;
+using System.Net;
 using GimnasioSolid.Controllers;
 using GimnasioSolid.Memberships;
 using GimnasioSolid.Models;
@@ -19,15 +20,38 @@ SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 
 app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", "<a class=\"button\" href=\"/members\">Gestión de miembros</a><a class=\"button\" href=\"/access\">Validación de acceso</a><a class=\"button\" href=\"/billing\">Facturación y reportes</a>", "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
 
-app.MapGet("/members", (IMemberRepository repository) =>
+app.MapGet("/members", (IMemberRepository repository, string? query) =>
 {
+    var filteredMembers = string.IsNullOrWhiteSpace(query)
+        ? repository.GetAll()
+        :repository.GetAll().Where(member => 
+        member.Id.Contains(query,
+        StringComparison.OrdinalIgnoreCase)||
+        member.Name.Contains(query,
+        StringComparison.OrdinalIgnoreCase));
+
+
     var rows = new StringBuilder();
-    foreach (var member in repository.GetAll())
+    foreach (var member in filteredMembers)
     {
-        rows.Append($"<tr><td>{member.Id}</td><td>{member.Name}</td><td>{member.MembershipPlan.GetType().Name}</td><td>{member.ExpirationDate:yyyy-MM-dd}</td></tr>");
+        rows.Append($"<tr><td>{member.Id}</td><td>{member.Name}</td><td>{member.MembershipPlan.GetType().Name}</td><td>{member.ExpirationDate:yyyy-MM-dd}</td><td><a class=\"button small\" href=\"/members/edit/{member.Id}\">Editar</a> <form method=\"post\" action=\"/members/delete\" style=\"display:inline;margin:0;\"><input type=\"hidden\" name=\"id\" value=\"{member.Id}\" /><button type=\"submit\" class=\"button danger\" onclick=\"return confirm('¿Eliminar miembro {member.Name}?');\">Eliminar</button></form></td></tr>");
     }
 
-    var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
+    var encodedQuery = WebUtility.HtmlEncode(query ?? string.Empty);
+    var searchInfo = string.IsNullOrWhiteSpace(query) 
+    ? string.Empty 
+    : $"<p>Resultados de búsqueda para: <strong>{encodedQuery}</strong></p>";
+
+    var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p>" +
+                  "<section class=\"card\"><h3>Buscar miembro</h3>" +
+                  $"<form method=\"get\" action=\"/members\"><label>Buscar por ID o nombre:<input name=\"query\" value=\"{encodedQuery}\" /></label><button type=\"submit\">Buscar</button></form>{searchInfo}</section>" +
+                  "<section class=\"card\"><h3>Listado de miembros</h3>" +
+                  $"<table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th><th>Acciones</th></tr>{rows}</table></section>" +
+                  "<section class=\"card\"><h3>Crear nuevo miembro</h3> ... </section>";
+
+    return Results.Content(PageLayout("Gestión de miembros", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
+
+    /*var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
                   "<section class=\"card\"><h3>Crear nuevo miembro</h3><p>Completa los datos del nuevo socio. El campo <strong>QR acceso</strong> se usará para validar con el lector QR, y el campo <strong>Huella</strong> se usará para validar con el lector de huella.</p>" +
                   "<form method=\"post\" action=\"/members\">" +
                   "<label>ID:<input name=\"id\" required /></label>" +
@@ -38,6 +62,7 @@ app.MapGet("/members", (IMemberRepository repository) =>
                   "<button type=\"submit\">Agregar miembro</button></form></section>";
 
     return Results.Content(PageLayout("Gestión de miembros", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
+*/
 });
 
 app.MapPost("/members", async (HttpRequest request, IMemberRepository repository) =>
