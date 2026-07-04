@@ -20,11 +20,31 @@ namespace GimnasioSolid.Models
         public IMembershipPlan MembershipPlan { get; }
         public string AccessKey { get; }
         public string FingerprintSignature { get; }
-        public DateTime ExpirationDate { get; }
+        public DateTime ExpirationDate { get; private set; }
+
+        /// <summary>
+        /// Indica si la membresía sigue vigente a la fecha de hoy.
+        /// </summary>
+        public bool IsActive => ExpirationDate.Date >= DateTime.Today;
+
+        /// <summary>
+        /// Indica si el pago del miembro está atrasado (la fecha de expiración ya pasó).
+        /// </summary>
+        public bool IsOverdue => ExpirationDate.Date < DateTime.Today;
 
         public bool IsValidAccessCredential(string credential)
         {
             return credential == AccessKey || credential == FingerprintSignature;
+        }
+
+        /// <summary>
+        /// Renueva la membresía a partir de la fecha de expiración vigente (o de hoy, si ya venció),
+        /// para no restarle días al miembro que paga por adelantado.
+        /// </summary>
+        public void RenewMembership(int months = 1)
+        {
+            var renewalStart = ExpirationDate.Date > DateTime.Today ? ExpirationDate.Date : DateTime.Today;
+            ExpirationDate = renewalStart.AddMonths(months);
         }
     }
 }
