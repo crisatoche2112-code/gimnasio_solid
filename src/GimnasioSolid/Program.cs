@@ -25,11 +25,8 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
     var filteredMembers = string.IsNullOrWhiteSpace(query)
         ? repository.GetAll()
         :repository.GetAll().Where(member => 
-        member.Id.Contains(query,
-        StringComparison.OrdinalIgnoreCase)||
-        member.Name.Contains(query,
-        StringComparison.OrdinalIgnoreCase));
-
+        member.Id.Contains(query, StringComparison.OrdinalIgnoreCase)||
+        member.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
 
     var rows = new StringBuilder();
     foreach (var member in filteredMembers)
@@ -50,8 +47,7 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
                   "<section class=\"card\"><h3>Crear nuevo miembro</h3> ... </section>";
 
     return Results.Content(PageLayout("Gestión de miembros", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
-
-    /*var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
+     /*var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
                   "<section class=\"card\"><h3>Crear nuevo miembro</h3><p>Completa los datos del nuevo socio. El campo <strong>QR acceso</strong> se usará para validar con el lector QR, y el campo <strong>Huella</strong> se usará para validar con el lector de huella.</p>" +
                   "<form method=\"post\" action=\"/members\">" +
                   "<label>ID:<input name=\"id\" required /></label>" +
@@ -86,7 +82,62 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
     repository.Save(new Member(id, name, plan, accessKey, fingerprint));
     return Results.Redirect("/members");
 });
+//---
 
+app.MapGet("/members/edit/{id}", (string id, IMemberRepository repository) =>
+{
+    var member = repository.FindById(id);
+    if (member is null)
+    {
+        return Results.Redirect("/members");
+    }
+
+    var selectedStudent = member.MembershipPlan is StudentMembership ? "selected" : string.Empty;
+    var selectedRegular = member.MembershipPlan is RegularMembership ? "selected" : string.Empty;
+    var selectedVip = member.MembershipPlan is VipMembership ? "selected" : string.Empty;
+    var selectedWeekend = member.MembershipPlan is WeekendMembership ? "selected" : string.Empty;
+
+    var content = $"<h2>Editar miembro {WebUtility.HtmlEncode(member.Name)}</h2>" +
+                  "<section class=\"card\"><form method=\"post\" action=\"/members/edit\">" +
+                  $"<input type=\"hidden\" name=\"id\" value=\"{WebUtility.HtmlEncode(member.Id)}\" />" +
+                  $"<label>ID:<input value=\"{WebUtility.HtmlEncode(member.Id)}\" disabled /></label>" +
+                  $"<label>Nombre:<input name=\"name\" value=\"{WebUtility.HtmlEncode(member.Name)}\" required /></label>" +
+                  $"<label>QR acceso:<input name=\"accessKey\" value=\"{WebUtility.HtmlEncode(member.AccessKey)}\" required /></label>" +
+                  $"<label>Huella:<input name=\"fingerprint\" value=\"{WebUtility.HtmlEncode(member.FingerprintSignature)}\" required /></label>" +
+                  "<label>Plan:<select name=\"plan\">" +
+                  $"<option value=\"student\" {selectedStudent}>Estudiante</option>" +
+                  $"<option value=\"regular\" {selectedRegular}>Regular</option>" +
+                  $"<option value=\"vip\" {selectedVip}>VIP</option>" +
+                  $"<option value=\"weekend\" {selectedWeekend}>Fin de semana</option>" +
+                  "</select></label>" +
+                  "<button type=\"submit\">Guardar cambios</button></form></section>";
+    
+    return Results.Content(PageLayout("Editar miembro", "<a class=\"button\" href=\"/members\">Volver a miembros</a>", content), "text/html");
+});
+
+app.MapPost("/members/edit", async (HttpRequest request, IMemberRepository repository) =>
+{
+    var form = await request.ReadFormAsync();
+    var id = form["id"].ToString();
+    var name = form["name"].ToString();
+    var accessKey = form["accessKey"].ToString();
+    var fingerprint = form["fingerprint"].ToString();
+    var planValue = form["plan"].ToString();
+
+    IMembershipPlan plan = planValue switch
+    {
+        "student" => new StudentMembership(),
+        "regular" => new RegularMembership(),
+        "vip" => new VipMembership(),
+        "weekend" => new WeekendMembership(),
+        _ => new RegularMembership()
+    };
+
+    repository.Save(new Member(id, name, plan, accessKey, fingerprint));
+    return Results.Redirect("/members");
+});
+
+//---
 app.MapGet("/access", () => Results.Content(PageLayout("Validación de acceso", "<a class=\"button\" href=\"/\">Menú principal</a>", "<h2>Validación de acceso</h2><p>Valida el ingreso de un miembro usando su credencial guardada. Elige el tipo de lector y presenta el dato correspondiente.</p><section class=\"info-box\"><strong>Cómo funciona:</strong><ul><li>Para <strong>QR</strong>: ingresa el valor exacto de <strong>QR acceso</strong> del miembro.</li><li>Para <strong>Huella</strong>: ingresa el valor de <strong>Huella</strong>. No importa si lo escribes en minúsculas.</li><li>El sistema busca el miembro y verifica si la credencial coincide con sus datos.</li></ul></section><form method=\"post\" action=\"/access\"><label>Datos presentados:<input name=\"presentedData\" required /></label><label>Lector:<select name=\"scanner\"><option value=\"qr\">QR</option><option value=\"fingerprint\">Huella</option></select></label><button type=\"submit\">Validar acceso</button></form>"), "text/html"));
 
 app.MapPost("/access", async (HttpRequest request, TurnstileController turnstile, AccessControl accessControl) =>
