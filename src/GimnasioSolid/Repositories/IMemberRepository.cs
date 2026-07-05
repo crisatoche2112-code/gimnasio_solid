@@ -9,5 +9,6 @@ namespace GimnasioSolid.Repositories
         Member? FindByAccessKey(string accessKey);
         IEnumerable<Member> GetAll();
         Member? FindById(string id);
+        void Delete(string id);
     }
 }

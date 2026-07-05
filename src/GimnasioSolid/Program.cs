@@ -44,7 +44,14 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
                   $"<form method=\"get\" action=\"/members\"><label>Buscar por ID o nombre:<input name=\"query\" value=\"{encodedQuery}\" /></label><button type=\"submit\">Buscar</button></form>{searchInfo}</section>" +
                   "<section class=\"card\"><h3>Listado de miembros</h3>" +
                   $"<table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th><th>Acciones</th></tr>{rows}</table></section>" +
-                  "<section class=\"card\"><h3>Crear nuevo miembro</h3> ... </section>";
+                  "<section class=\"card\"><h3>Crear nuevo miembro</h3> <p>Completa los datos del nuevo socio. El campo <strong>QR acceso</strong> se usará para validar con el lector QR, y el campo <strong>Huella</strong> se usará para validar con el lector de huella.</p>" +
+                  "<form method=\"post\" action=\"/members\">" +
+                  "<label>ID:<input name=\"id\" required /></label>" +
+                  "<label>Nombre:<input name=\"name\" required /></label>" +
+                  "<label>QR acceso:<input name=\"accessKey\" required /></label>" +
+                  "<label>Huella:<input name=\"fingerprint\" required /></label>" +
+                  "<label>Plan:<select name=\"plan\"><option value=\"student\">Estudiante</option><option value=\"regular\">Regular</option><option value=\"vip\">VIP</option><option value=\"weekend\">Fin de semana</option></select></label>" +
+                  "<button type=\"submit\">Agregar miembro</button></form> </section>";
 
     return Results.Content(PageLayout("Gestión de miembros", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
      /*var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
@@ -135,6 +142,14 @@ app.MapPost("/members/edit", async (HttpRequest request, IMemberRepository repos
 
     repository.Save(new Member(id, name, plan, accessKey, fingerprint));
     return Results.Redirect("/members");
+});
+
+app.MapPost("/members/delete", async (HttpRequest request, IMemberRepository repository) =>
+{
+   var form = await request.ReadFormAsync();
+   var id = form["id"].ToString();
+   repository.Delete(id);
+   return Results.Redirect("/members"); 
 });
 
 //---

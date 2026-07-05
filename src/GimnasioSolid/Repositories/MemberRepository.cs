@@ -55,5 +55,19 @@ namespace GimnasioSolid.Repositories
         }
 
         public IEnumerable<Member> GetAll() => _membersById.Values;
+
+        public void Delete(String id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            if ( _membersById.Remove(id.Trim(), out var existing))
+            {
+                _credentialToId.Remove(existing.AccessKey);
+                _credentialToId.Remove(existing.FingerprintSignature);
+            }
+        }
     }
 }
