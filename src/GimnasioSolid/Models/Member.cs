@@ -25,7 +25,7 @@ namespace GimnasioSolid.Models
         // Indica si la membresía sigue vigente a la fecha de hoy
         public bool IsActive => ExpirationDate.Date >= DateTime.Today;
 
-        /// Indica si el pago del miembro está atrasado (la fecha de expiración ya pasó)
+        // Indica si el pago del miembro está atrasado (la fecha de expiración ya pasó)
         public bool IsOverdue => ExpirationDate.Date < DateTime.Today;
 
         public bool IsValidAccessCredential(string credential)

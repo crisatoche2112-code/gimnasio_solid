@@ -6,7 +6,7 @@ namespace GimnasioSolid.Services
 {
     public sealed class BillingService : IBillingService
     {
-        // Recargo por mora: 10% de la cuota base cuando el miembro paga vencido.
+        // Recargo por mora: 10% de la cuota base cuando el miembro paga vencido
         private const decimal LateFeePercentage = 0.10m;
 
         private readonly IPaymentRepository _paymentRepository;

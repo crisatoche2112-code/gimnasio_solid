@@ -20,21 +20,22 @@ namespace GimnasioSolid.Models
         public string MemberName { get; }
         public string PlanName { get; }
 
-        /// <summary>Cuota base del plan, sin recargos.</summary>
+        // Cuota base del plan, sin recargos
         public decimal BaseAmount { get; }
 
-        /// <summary>Recargo por mora (0 si el pago fue puntual).</summary>
+        // Recargo por mora (0 si el pago fue puntual)
         public decimal LateFee { get; }
 
-        /// <summary>Total cobrado (BaseAmount + LateFee).</summary>
+        /// Total cobrado (BaseAmount + LateFee).
         public decimal Amount => BaseAmount + LateFee;
 
+        // Total cobrado
         public DateTime Date { get; }
 
-        /// <summary>Numero de comprobante/recibo generado para este pago.</summary>
+        // Numero de comprobante generado para este pago
         public string ReceiptNumber { get; }
 
-        /// <summary>Medio con el que se realizó el pago (Efectivo, Tarjeta, Billetera digital).</summary>
+        // Medio con el que se realizó el pago
         public string PaymentMethod { get; }
     }
 }
