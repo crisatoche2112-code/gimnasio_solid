@@ -6,7 +6,7 @@ namespace GimnasioSolid.Services
 {
     public sealed class BillingService : IBillingService
     {
-        /// <summary>Recargo por mora: 10% de la cuota base cuando el miembro paga vencido.</summary>
+        // Recargo por mora: 10% de la cuota base cuando el miembro paga vencido.
         private const decimal LateFeePercentage = 0.10m;
 
         private readonly IPaymentRepository _paymentRepository;
@@ -27,7 +27,7 @@ namespace GimnasioSolid.Services
             return baseAmount + CalculateLateFee(member, baseAmount);
         }
 
-        public PaymentRecord RegisterMonthlyPayment(Member member)
+        public PaymentRecord RegisterMonthlyPayment(Member member, string paymentMethod)
         {
             if (member is null)
             {
@@ -37,6 +37,7 @@ namespace GimnasioSolid.Services
             var baseAmount = member.MembershipPlan.CalculatePrice();
             var lateFee = CalculateLateFee(member, baseAmount);
             var receiptNumber = GenerateReceiptNumber(member);
+            var normalizedPaymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Efectivo" : paymentMethod;
 
             var paymentRecord = new PaymentRecord(
                 member.Id,
@@ -45,7 +46,8 @@ namespace GimnasioSolid.Services
                 baseAmount,
                 lateFee,
                 DateTime.Now,
-                receiptNumber);
+                receiptNumber,
+                normalizedPaymentMethod);
 
             _paymentRepository.Save(paymentRecord);
 

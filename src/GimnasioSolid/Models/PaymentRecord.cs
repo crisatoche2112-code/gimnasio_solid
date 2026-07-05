@@ -4,7 +4,7 @@ namespace GimnasioSolid.Models
 {
     public sealed class PaymentRecord
     {
-        public PaymentRecord(string memberId, string memberName, string planName, decimal baseAmount, decimal lateFee, DateTime date, string receiptNumber)
+        public PaymentRecord(string memberId, string memberName, string planName, decimal baseAmount, decimal lateFee, DateTime date, string receiptNumber, string paymentMethod)
         {
             MemberId = memberId;
             MemberName = memberName;
@@ -13,6 +13,7 @@ namespace GimnasioSolid.Models
             LateFee = lateFee;
             Date = date;
             ReceiptNumber = receiptNumber;
+            PaymentMethod = paymentMethod;
         }
 
         public string MemberId { get; }
@@ -32,5 +33,8 @@ namespace GimnasioSolid.Models
 
         /// <summary>Numero de comprobante/recibo generado para este pago.</summary>
         public string ReceiptNumber { get; }
+
+        /// <summary>Medio con el que se realizó el pago (Efectivo, Tarjeta, Billetera digital).</summary>
+        public string PaymentMethod { get; }
     }
 }
