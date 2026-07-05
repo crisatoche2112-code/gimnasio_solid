@@ -33,8 +33,8 @@ app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID",
     "<a class=\"button\" href=\"/members\">Gestión de miembros</a>" +
     "<a class=\"button\" href=\"/access\">Validación de acceso</a>" +
     "<a class=\"button\" href=\"/billing\">Facturación y reportes</a>" +
-    "<a class=\"button\" style=\"background:#dc3545;\" href=\"/api/reportsandalerts/alerts\" target=\"_blank\">⚠️ Ver Alertas</a>" +
-    "<a class=\"button\" style=\"background:#28a745;\" href=\"/api/reportsandalerts/download-csv\">📊 Reporte CSV</a>", 
+    "<a class=\"button\" style=\"background:#dc3545;\" href=\"/api/reportsandalerts/alerts\" target=\"_blank\">Ver Alertas</a>" +
+    "<a class=\"button\" style=\"background:#28a745;\" href=\"/api/reportsandalerts/download-csv\">Reporte CSV</a>", 
     "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
 
 app.MapGet("/members", (IMemberRepository repository) =>
