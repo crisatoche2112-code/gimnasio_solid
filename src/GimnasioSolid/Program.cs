@@ -10,14 +10,66 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IMemberRepository, MemberRepository>();
 builder.Services.AddSingleton<IPaymentRepository, PaymentRepository>();
 builder.Services.AddSingleton<IAccessLogRepository, AccessLogRepository>();
+builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<BillingService>();
+builder.Services.AddSingleton<AuthenticationService>();
 builder.Services.AddSingleton<AccessControl>(sp => new AccessControl(new QrCodeScanner()));
 builder.Services.AddSingleton<TurnstileController>();
+builder.Services.AddSingleton<LoginController>();
 
 var app = builder.Build();
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
+SeedUsers(app.Services.GetRequiredService<IUserRepository>(), app.Services.GetRequiredService<AuthenticationService>());
 
-app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", "<a class=\"button\" href=\"/members\">Gestión de miembros</a><a class=\"button\" href=\"/access\">Validación de acceso</a><a class=\"button\" href=\"/billing\">Facturación y reportes</a>", "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
+app.MapGet("/login", () => Results.Content(PageLayout("Login", "", "<h2>Iniciar sesión</h2><section class=\"card\"><form method=\"post\" action=\"/login\"><label>Usuario:<input name=\"username\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><button type=\"submit\">Ingresar</button></form><p><a href=\"/register\">¿No tienes cuenta? Regístrate aquí</a></p></section>"), "text/html"));
+
+app.MapPost("/login", async (HttpRequest request, LoginController loginController) =>
+{
+    var form = await request.ReadFormAsync();
+    var username = form["username"].ToString();
+    var password = form["password"].ToString();
+    
+    var user = loginController.Login(username, password);
+    if (user == null)
+    {
+        var errorContent = "<h2>Error de login</h2><p>Usuario o contraseña incorrectos</p><p><a href=\"/login\">Volver a intentar</a></p>";
+        return Results.Content(PageLayout("Error de Login", "", errorContent), "text/html");
+    }
+
+    var successContent = $"<h2>¡Bienvenido, {user.Username}!</h2><p>Tu rol es: <strong>{user.Role}</strong></p><p><a href=\"/\">Ir al menú principal</a></p>";
+    return Results.Content(PageLayout("Login exitoso", "", successContent), "text/html");
+});
+
+app.MapGet("/register", () => Results.Content(PageLayout("Registrarse", "", "<h2>Crear nueva cuenta</h2><section class=\"card\"><form method=\"post\" action=\"/register\"><label>ID:<input name=\"id\" required /></label><label>Usuario:<input name=\"username\" required /></label><label>Email:<input name=\"email\" type=\"email\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><label>Rol:<select name=\"role\"><option value=\"Member\">Miembro</option><option value=\"Staff\">Personal</option><option value=\"Manager\">Gerente</option><option value=\"Admin\">Administrador</option></select></label><button type=\"submit\">Registrarse</button></form><p><a href=\"/login\">¿Ya tienes cuenta? Inicia sesión</a></p></section>"), "text/html"));
+
+app.MapPost("/register", async (HttpRequest request, LoginController loginController) =>
+{
+    var form = await request.ReadFormAsync();
+    var id = form["id"].ToString();
+    var username = form["username"].ToString();
+    var email = form["email"].ToString();
+    var password = form["password"].ToString();
+    var roleValue = form["role"].ToString();
+
+    if (!Enum.TryParse<Role>(roleValue, out var role))
+    {
+        role = Role.Member;
+    }
+
+    try
+    {
+        loginController.Register(id, username, email, password, role);
+        var successContent = $"<h2>Registro exitoso</h2><p>Cuenta creada para <strong>{username}</strong></p><p><a href=\"/login\">Inicia sesión aquí</a></p>";
+        return Results.Content(PageLayout("Registro completado", "", successContent), "text/html");
+    }
+    catch (InvalidOperationException ex)
+    {
+        var errorContent = $"<h2>Error en el registro</h2><p>{ex.Message}</p><p><a href=\"/register\">Intentar de nuevo</a></p>";
+        return Results.Content(PageLayout("Error de Registro", "", errorContent), "text/html");
+    }
+});
+
+app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", "<a class=\"button\" href=\"/members\">Gestión de miembros</a><a class=\"button\" href=\"/access\">Validación de acceso</a><a class=\"button\" href=\"/billing\">Facturación y reportes</a><a class=\"button\" href=\"/login\">Login</a>", "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a><a class=\"button\" href=\"/login\">Login</a></div></section>"), "text/html"));
 
 app.MapGet("/members", (IMemberRepository repository) =>
 {
@@ -145,5 +197,20 @@ static void SeedMembers(IMemberRepository repository)
     foreach (var member in members)
     {
         repository.Save(member);
+    }
+}
+
+static void SeedUsers(IUserRepository repository, AuthenticationService authService)
+{
+    try
+    {
+        authService.CreateUser("U001", "admin", "admin@gimnasio.com", "admin123", Role.Admin);
+        authService.CreateUser("U002", "manager", "manager@gimnasio.com", "manager123", Role.Manager);
+        authService.CreateUser("U003", "staff", "staff@gimnasio.com", "staff123", Role.Staff);
+        authService.CreateUser("U004", "member", "member@gimnasio.com", "member123", Role.Member);
+    }
+    catch (InvalidOperationException)
+    {
+        // Los usuarios ya existen, no hacer nada
     }
 }
