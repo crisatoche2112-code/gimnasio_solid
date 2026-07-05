@@ -152,13 +152,13 @@ static string PageLayout(string title, string navigation, string content)
 
 static void SeedMembers(IMemberRepository repository)
 {
-    // Creamos los miembros usando el constructor original sin modificar sus propiedades directamente
-    var member1 = new Member("A100", "Aaron", new StudentMembership(), "A100", "FP-A100");
-    var member2 = new Member("B200", "Angel", new VipMembership(), "B200", "FP-B200");
+    var member1 = new Member("A100", "Aaron", new StudentMembership(), "A100", "FP-A100", DateTime.Today.AddDays(-5));
+    
+    var member2 = new Member("B200", "Angel", new VipMembership(), "B200", "FP-B200", DateTime.Today.AddDays(3));
+    
     var member3 = new Member("C300", "Luis", new WeekendMembership(), "C300", "FP-C300");
     var member4 = new Member("D400", "Sebastian", new RegularMembership(), "D400", "FP-D400");
 
-    // Los guardamos en el repositorio
     repository.Save(member1);
     repository.Save(member2);
     repository.Save(member3);
