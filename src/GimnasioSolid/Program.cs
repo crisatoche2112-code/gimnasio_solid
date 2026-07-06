@@ -42,17 +42,17 @@ app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccess
 
     var content =
         "<section class=\"hero\">" +
-        "<div><span class=\"eyebrow\">Panel principal</span><h2>Gimnasio SOLID</h2><p>Administra socios, valida accesos, registra pagos y consulta reportes desde un tablero limpio y directo.</p></div>" +
+        "<div><span class=\"eyebrow\">Panel principal</span><h2>DeporVida Fitness SOLID</h2><p>Administra socios, valida accesos, registra pagos y consulta reportes desde un tablero limpio y directo.</p></div>" +
         "<div class=\"hero-actions\"><a class=\"primary-action\" href=\"/members\">Gestionar miembros</a><a class=\"secondary-action\" href=\"/access\">Validar acceso</a></div>" +
         "</section>" +
         "<section class=\"stats-grid\">" +
         StatCard("Miembros activos", allMembers.Count.ToString(), "Socios registrados") +
         StatCard("Ingresos registrados", Money(totalRevenue), "Pagos confirmados") +
-        StatCard("Proyeccion mensual", Money(monthlyProjection), "Segun planes actuales") +
-        StatCard("Accesos permitidos", allowedEntries.ToString(), "Historial de validacion") +
+        StatCard("Proyección mensual", Money(monthlyProjection), "Según planes actuales") +
+        StatCard("Accesos permitidos", allowedEntries.ToString(), "Historial de validación") +
         "</section>" +
         "<section class=\"content-grid\">" +
-        "<article class=\"panel\"><h3>Operaciones rapidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a><a href=\"/login\">Login</a></div></article>" +
+        "<article class=\"panel\"><h3>Operaciones rápidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a><a href=\"/login\">Login</a></div></article>" +
         "<article class=\"panel\"><h3>Reportes</h3><div class=\"quick-actions\"><a href=\"/api/reportsandalerts/alerts\" target=\"_blank\">Ver alertas</a><a href=\"/api/reportsandalerts/download-csv\">Reporte CSV</a></div></article>" +
         "</section>";
 
@@ -62,10 +62,10 @@ app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccess
 app.MapGet("/login", () =>
 {
     var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Usuarios</span><h2>Iniciar sesion</h2><p>Accede con una cuenta registrada para identificar tu rol.</p></section>" +
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Usuarios</span><h2>Iniciar sesión</h2><p>Accede con una cuenta registrada para identificar tu rol.</p></section>" +
         "<section class=\"content-grid two-columns\"><article class=\"panel\"><h3>Credenciales</h3><form class=\"stacked-form\" method=\"post\" action=\"/login\">" +
         "<label>Usuario<input name=\"username\" required /></label>" +
-        "<label>Contrasena<input name=\"password\" type=\"password\" required /></label>" +
+        "<label>Contraseña<input name=\"password\" type=\"password\" required /></label>" +
         "<button type=\"submit\">Ingresar</button></form></article>" +
         "<article class=\"panel\"><h3>Nuevo usuario</h3><p class=\"muted-copy\">Registra una cuenta para operar el sistema con un rol definido.</p><div class=\"quick-actions\"><a href=\"/register\">Crear cuenta</a></div></article></section>";
 
@@ -81,7 +81,7 @@ app.MapPost("/login", async (HttpRequest request, LoginController loginControlle
 
     if (user is null)
     {
-        var errorContent = "<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Error de login</h2><p>Usuario o contrasena incorrectos.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Volver a intentar</a></div>";
+        var errorContent = "<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Error de login</h2><p>Usuario o contraseña incorrectos.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Volver a intentar</a></div>";
         return Results.Content(PageLayout("Error de Login", "login", errorContent), "text/html");
     }
 
@@ -97,7 +97,7 @@ app.MapGet("/register", () =>
         "<label>ID<input name=\"id\" required /></label>" +
         "<label>Usuario<input name=\"username\" required /></label>" +
         "<label>Email<input name=\"email\" type=\"email\" required /></label>" +
-        "<label>Contrasena<input name=\"password\" type=\"password\" required /></label>" +
+        "<label>Contraseña<input name=\"password\" type=\"password\" required /></label>" +
         "<label>Rol<select name=\"role\"><option value=\"Member\">Miembro</option><option value=\"Staff\">Personal</option><option value=\"Manager\">Gerente</option><option value=\"Admin\">Administrador</option></select></label>" +
         "<button type=\"submit\">Registrarse</button></form></section>";
 
@@ -121,7 +121,7 @@ app.MapPost("/register", async (HttpRequest request, LoginController loginContro
     try
     {
         loginController.Register(id, username, email, password, role);
-        var successContent = $"<section class=\"result-panel allowed\"><span class=\"status-dot\"></span><div><h2>Registro exitoso</h2><p>Cuenta creada para <strong>{Enc(username)}</strong>.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Iniciar sesion</a></div>";
+        var successContent = $"<section class=\"result-panel allowed\"><span class=\"status-dot\"></span><div><h2>Registro exitoso</h2><p>Cuenta creada para <strong>{Enc(username)}</strong>.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Iniciar sesión</a></div>";
         return Results.Content(PageLayout("Registro completado", "login", successContent), "text/html");
     }
     catch (InvalidOperationException ex)
@@ -166,7 +166,7 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
         : $"<span class=\"counter\">Filtro: {encodedQuery}</span>";
 
     var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Gestion de miembros</h2><p>Consulta socios activos y registra nuevas credenciales de acceso.</p></section>" +
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Gestión de miembros</h2><p>Consulta socios activos y registra nuevas credenciales de acceso.</p></section>" +
         "<section class=\"content-grid two-columns\">" +
         "<article class=\"panel wide\"><div class=\"panel-title\"><h3>Listado de miembros</h3><span class=\"counter\">" + repository.GetAll().Count() + " registrados</span></div>" +
         "<form class=\"filter-bar\" method=\"get\" action=\"/members\"><input name=\"query\" value=\"" + encodedQuery + "\" placeholder=\"Buscar por ID o nombre\" /><button type=\"submit\">Buscar</button></form>" +
@@ -176,7 +176,7 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
         "<form class=\"stacked-form\" method=\"post\" action=\"/members\">" +
         "<label>ID<input name=\"id\" required placeholder=\"Ej. E500\" /></label>" +
         "<label>Nombre<input name=\"name\" required placeholder=\"Nombre completo\" /></label>" +
-        "<label>QR acceso<input name=\"accessKey\" required placeholder=\"Codigo QR\" /></label>" +
+        "<label>QR acceso<input name=\"accessKey\" required placeholder=\"Código QR\" /></label>" +
         "<label>Huella<input name=\"fingerprint\" required placeholder=\"Firma de huella\" /></label>" +
         "<label>Plan<select name=\"plan\"><option value=\"student\">Estudiante</option><option value=\"regular\">Regular</option><option value=\"vip\">VIP</option><option value=\"weekend\">Fin de semana</option></select></label>" +
         "<button type=\"submit\">Agregar miembro</button></form></article>" +
@@ -254,7 +254,7 @@ app.MapPost("/members/delete", async (HttpRequest request, IMemberRepository rep
 
 app.MapGet("/access", (IMemberRepository members, IAccessLogRepository accessLogs) =>
 {
-    return Results.Content(PageLayout("Validacion de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
+    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
 });
 
 app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
@@ -262,7 +262,7 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
     var form = await request.ReadFormAsync();
     var readerOutput = form["readerOutput"].ToString();
     var readerType = form["readerType"].ToString();
-    var readerName = readerType == "fingerprint" ? "Huella biometrica" : "Codigo QR";
+    var readerName = readerType == "fingerprint" ? "Huella biométrica" : "Codigo QR";
     IAccessScanner activeScanner = readerType == "fingerprint"
         ? new FingerprintScanner()
         : new QrCodeScanner();
@@ -357,7 +357,7 @@ app.MapGet("/billing", (HttpRequest request, IMemberRepository members, IPayment
         "</div>";
 
     var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Facturacion</span><h2>Pagos y reportes</h2><p>Revisa cuotas mensuales, registra pagos y consulta el historial financiero.</p></section>" +
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Facturación</span><h2>Pagos y reportes</h2><p>Revisa cuotas mensuales, registra pagos y consulta el historial financiero.</p></section>" +
         banner +
         "<section class=\"stats-grid compact\">" +
         StatCard("Miembros", allMembers.Count.ToString(), "Con plan vigente") +
@@ -444,14 +444,14 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> 
     }
 
     var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validacion de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
+        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validación de acceso</h2><p>Panel para acceso mediante QR o lector biométrico de huella.</p></section>"
         : string.Empty;
 
     return heading +
         "<section class=\"content-grid two-columns\">" +
         "<article class=\"panel\"><h3>Simular lectura</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
         "<label>Salida del lector<input name=\"readerOutput\" required placeholder=\"Ej. A100 o FP-A100\" /></label>" +
-        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Camara / lector QR</option><option value=\"fingerprint\">Lector biometrico de huella</option></select></label>" +
+        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Cámara / Lector QR</option><option value=\"fingerprint\">Lector biométrico de huella</option></select></label>" +
         "<button type=\"submit\">Validar acceso</button></form></article>" +
         "<article class=\"panel wide\"><h3>Credenciales simuladas</h3><div class=\"table-wrap\"><table class=\"data-table compact-table\"><thead><tr><th>Socio</th><th>Salida QR</th><th>Salida huella</th></tr></thead><tbody>" + exampleRows + "</tbody></table></div></article>" +
         "</section>" +
@@ -524,14 +524,14 @@ static string PageLayout(string title, string activeSection, string content)
         NavLink("/", "Inicio", activeSection == "home") +
         NavLink("/members", "Miembros", activeSection == "members") +
         NavLink("/access", "Acceso", activeSection == "access") +
-        NavLink("/billing", "Facturacion", activeSection == "billing") +
+        NavLink("/billing", "Facturación", activeSection == "billing") +
         NavLink("/login", "Login", activeSection == "login");
 
     return "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
         $"<title>{Enc(title)} | Gimnasio SOLID</title><style>{CssStyles()}</style></head>" +
         "<body><div class=\"app-shell\"><header><div class=\"topbar\">" +
-        "<a class=\"brand\" href=\"/\"><span class=\"brand-mark\">GS</span><span><strong>Gimnasio SOLID</strong><span>Control operativo</span></span></a>" +
+        "<a class=\"brand\" href=\"/\"><span class=\"brand-mark\">GS</span><span><strong>DeporVida SOLID</strong><span>Control operativo</span></span></a>" +
         $"<nav aria-label=\"Navegacion principal\">{navigation}</nav></div></header><main>{content}</main></div></body></html>";
 }
 
