@@ -11,6 +11,8 @@ using QuestPDF.Infrastructure;
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Repositorios originales
 builder.Services.AddSingleton<IMemberRepository, MemberRepository>();
 builder.Services.AddSingleton<IPaymentRepository, PaymentRepository>();
 builder.Services.AddSingleton<IAccessLogRepository, AccessLogRepository>();
@@ -19,10 +21,26 @@ builder.Services.AddSingleton<IReceiptPdfGenerator, ReceiptPdfGenerator>();
 builder.Services.AddSingleton<AccessControl>(sp => new AccessControl(new QrCodeScanner()));
 builder.Services.AddSingleton<TurnstileController>();
 
+// === TUS NUEVOS SERVICIOS CON PRINCIPIOS SOLID ===
+builder.Services.AddControllers(); // Habilita los controladores como el de reportes
+builder.Services.AddScoped<IAlertService, GymAlertService>();
+builder.Services.AddScoped<IReportService, CsvReportService>();
+
 var app = builder.Build();
+
+// Mapea las rutas automáticas de tus controladores (como /api/reportsandalerts/alerts)
+app.MapControllers();
+
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 
-app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", "<a class=\"button\" href=\"/members\">Gestión de miembros</a><a class=\"button\" href=\"/access\">Validación de acceso</a><a class=\"button\" href=\"/billing\">Facturación y reportes</a>", "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
+// MENÚ PRINCIPAL: Se agregaron los dos nuevos botones para Alertas y Reporte CSV
+app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", 
+    "<a class=\"button\" href=\"/members\">Gestión de miembros</a>" +
+    "<a class=\"button\" href=\"/access\">Validación de acceso</a>" +
+    "<a class=\"button\" href=\"/billing\">Facturación y reportes</a>" +
+    "<a class=\"button\" style=\"background:#dc3545;\" href=\"/api/reportsandalerts/alerts\" target=\"_blank\">Ver Alertas</a>" +
+    "<a class=\"button\" style=\"background:#28a745;\" href=\"/api/reportsandalerts/download-csv\">Reporte CSV</a>", 
+    "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
 
 app.MapGet("/members", (IMemberRepository repository) =>
 {
@@ -253,16 +271,15 @@ static string PageLayout(string title, string navigation, string content)
 
 static void SeedMembers(IMemberRepository repository)
 {
-    var members = new List<Member>
-    {
-        new Member("A100", "Aaron", new StudentMembership(), "A100", "FP-A100"),
-        new Member("B200", "Angel", new VipMembership(), "B200", "FP-B200"),
-        new Member("C300", "Luis", new WeekendMembership(), "C300", "FP-C300"),
-        new Member("D400", "Sebastian", new RegularMembership(), "D400", "FP-D400")
-    };
+    var member1 = new Member("A100", "Aaron", new StudentMembership(), "A100", "FP-A100", DateTime.Today.AddDays(-5));
+    
+    var member2 = new Member("B200", "Angel", new VipMembership(), "B200", "FP-B200", DateTime.Today.AddDays(3));
+    
+    var member3 = new Member("C300", "Luis", new WeekendMembership(), "C300", "FP-C300");
+    var member4 = new Member("D400", "Sebastian", new RegularMembership(), "D400", "FP-D400");
 
-    foreach (var member in members)
-    {
-        repository.Save(member);
-    }
+    repository.Save(member1);
+    repository.Save(member2);
+    repository.Save(member3);
+    repository.Save(member4);
 }
