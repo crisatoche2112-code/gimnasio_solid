@@ -19,6 +19,16 @@ namespace GimnasioSolid.Repositories
             _membersByAccessKey[member.FingerprintSignature] = member;
         }
 
+        public Member? GetById(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            return GetAll().FirstOrDefault(member => member.Id.Equals(id.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
         public Member? FindByAccessKey(string accessKey)
         {
             if (string.IsNullOrWhiteSpace(accessKey))
@@ -31,5 +41,28 @@ namespace GimnasioSolid.Repositories
         }
 
         public IEnumerable<Member> GetAll() => _membersByAccessKey.Values.DistinctBy(member => member.Id);
+
+        public void Update(Member member)
+        {
+            if (member is null)
+            {
+                return;
+            }
+
+            Delete(member.Id);
+            Save(member);
+        }
+
+        public void Delete(string id)
+        {
+            var member = GetById(id);
+            if (member is null)
+            {
+                return;
+            }
+
+            _membersByAccessKey.Remove(member.AccessKey);
+            _membersByAccessKey.Remove(member.FingerprintSignature);
+        }
     }
 }

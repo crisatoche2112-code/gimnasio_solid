@@ -148,12 +148,16 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
         rows.Append($"<td>{Enc(member.Name)}</td>");
         rows.Append($"<td><span class=\"badge\">{PlanDisplayName(member.MembershipPlan)}</span></td>");
         rows.Append($"<td>{member.ExpirationDate:dd/MM/yyyy}</td>");
+        rows.Append("<td><div class=\"table-actions\">");
+        rows.Append($"<a href=\"/members/edit/{Uri.EscapeDataString(member.Id)}\">Editar</a>");
+        rows.Append($"<form method=\"post\" action=\"/members/delete\"><input type=\"hidden\" name=\"id\" value=\"{Enc(member.Id)}\" /><button type=\"submit\" class=\"danger-action\" onclick=\"return confirm('Eliminar miembro {Enc(member.Name)}?');\">Eliminar</button></form>");
+        rows.Append("</div></td>");
         rows.Append("</tr>");
     }
 
     if (rows.Length == 0)
     {
-        rows.Append("<tr><td colspan=\"4\" class=\"empty-state\">No hay miembros registrados.</td></tr>");
+        rows.Append("<tr><td colspan=\"5\" class=\"empty-state\">No hay miembros registrados.</td></tr>");
     }
 
     var encodedQuery = Enc(query ?? string.Empty);
@@ -167,7 +171,7 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
         "<article class=\"panel wide\"><div class=\"panel-title\"><h3>Listado de miembros</h3><span class=\"counter\">" + repository.GetAll().Count() + " registrados</span></div>" +
         "<form class=\"filter-bar\" method=\"get\" action=\"/members\"><input name=\"query\" value=\"" + encodedQuery + "\" placeholder=\"Buscar por ID o nombre\" /><button type=\"submit\">Buscar</button></form>" +
         searchInfo +
-        "<div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiracion</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
+        "<div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiracion</th><th>Acciones</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
         "<article class=\"panel\"><h3>Crear nuevo miembro</h3>" +
         "<form class=\"stacked-form\" method=\"post\" action=\"/members\">" +
         "<label>ID<input name=\"id\" required placeholder=\"Ej. E500\" /></label>" +
@@ -189,17 +193,62 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
     var accessKey = form["accessKey"].ToString();
     var fingerprint = form["fingerprint"].ToString();
     var planValue = form["plan"].ToString();
-
-    IMembershipPlan plan = planValue switch
-    {
-        "student" => new StudentMembership(),
-        "regular" => new RegularMembership(),
-        "vip" => new VipMembership(),
-        "weekend" => new WeekendMembership(),
-        _ => new RegularMembership()
-    };
+    var plan = CreatePlan(planValue);
 
     repository.Save(new Member(id, name, plan, accessKey, fingerprint));
+    return Results.Redirect("/members");
+});
+
+app.MapGet("/members/edit/{id}", (string id, IMemberRepository repository) =>
+{
+    var member = repository.GetById(id);
+    if (member is null)
+    {
+        var notFoundContent =
+            "<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Miembro no encontrado</h2><p>Verifica el ID e intentalo nuevamente.</p></div></section>" +
+            "<div class=\"quick-actions\"><a href=\"/members\">Volver a miembros</a></div>";
+        return Results.Content(PageLayout("Miembro no encontrado", "members", notFoundContent), "text/html");
+    }
+
+    var content =
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Editar miembro</h2><p>Actualiza datos del socio sin perder su fecha de expiracion vigente.</p></section>" +
+        "<section class=\"panel\"><form class=\"stacked-form\" method=\"post\" action=\"/members/update\">" +
+        $"<label>ID<input name=\"id\" value=\"{Enc(member.Id)}\" readonly /></label>" +
+        $"<label>Nombre<input name=\"name\" value=\"{Enc(member.Name)}\" required /></label>" +
+        $"<label>QR acceso<input name=\"accessKey\" value=\"{Enc(member.AccessKey)}\" required /></label>" +
+        $"<label>Huella<input name=\"fingerprint\" value=\"{Enc(member.FingerprintSignature)}\" required /></label>" +
+        $"<label>Plan<select name=\"plan\">{PlanOptions(PlanCode(member.MembershipPlan))}</select></label>" +
+        "<div class=\"quick-actions\"><button type=\"submit\">Guardar cambios</button><a href=\"/members\">Cancelar</a></div>" +
+        "</form></section>";
+
+    return Results.Content(PageLayout("Editar miembro", "members", content), "text/html");
+});
+
+app.MapPost("/members/update", async (HttpRequest request, IMemberRepository repository) =>
+{
+    var form = await request.ReadFormAsync();
+    var id = form["id"].ToString();
+    var existingMember = repository.GetById(id);
+    if (existingMember is null)
+    {
+        return Results.Redirect("/members");
+    }
+
+    var name = form["name"].ToString();
+    var accessKey = form["accessKey"].ToString();
+    var fingerprint = form["fingerprint"].ToString();
+    var plan = CreatePlan(form["plan"].ToString());
+    var updatedMember = new Member(id, name, plan, accessKey, fingerprint, existingMember.ExpirationDate);
+
+    repository.Update(updatedMember);
+    return Results.Redirect("/members");
+});
+
+app.MapPost("/members/delete", async (HttpRequest request, IMemberRepository repository) =>
+{
+    var form = await request.ReadFormAsync();
+    var id = form["id"].ToString();
+    repository.Delete(id);
     return Results.Redirect("/members");
 });
 
@@ -544,6 +593,11 @@ static string CssStyles()
         .data-table th, .data-table td { padding:13px 14px; text-align:left; border-bottom:1px solid var(--line); }
         .data-table th { background:#f8fafc; color:var(--muted); font-size:.78rem; text-transform:uppercase; }
         .data-table tr:last-child td { border-bottom:0; }
+        .table-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+        .table-actions a { min-height:34px; display:inline-flex; align-items:center; padding:0 12px; border-radius:8px; background:#eef6f2; color:var(--brand-dark); font-weight:800; text-decoration:none; }
+        .table-actions form { margin:0; }
+        .danger-action { min-height:34px; padding:0 12px; background:var(--danger); color:#fff; box-shadow:none; }
+        .danger-action:hover { background:#7a271a; }
         .member-row { cursor:pointer; }
         .member-row:hover { background:#eef6f2; }
         .row-overdue { background:#fff4f2; }
@@ -575,6 +629,50 @@ static string NavLink(string href, string text, bool active)
 static string StatCard(string label, string value, string description)
 {
     return $"<article class=\"stat-card\"><span>{Enc(label)}</span><strong>{Enc(value)}</strong><span>{Enc(description)}</span></article>";
+}
+
+static IMembershipPlan CreatePlan(string planValue)
+{
+    return planValue switch
+    {
+        "student" => new StudentMembership(),
+        "regular" => new RegularMembership(),
+        "vip" => new VipMembership(),
+        "weekend" => new WeekendMembership(),
+        _ => new RegularMembership()
+    };
+}
+
+static string PlanCode(IMembershipPlan plan)
+{
+    return plan switch
+    {
+        StudentMembership => "student",
+        RegularMembership => "regular",
+        VipMembership => "vip",
+        WeekendMembership => "weekend",
+        _ => "regular"
+    };
+}
+
+static string PlanOptions(string selectedPlan)
+{
+    var options = new[]
+    {
+        ("student", "Estudiante"),
+        ("regular", "Regular"),
+        ("vip", "VIP"),
+        ("weekend", "Fin de semana")
+    };
+
+    var builder = new StringBuilder();
+    foreach (var (value, label) in options)
+    {
+        var selected = value == selectedPlan ? " selected" : string.Empty;
+        builder.Append($"<option value=\"{value}\"{selected}>{label}</option>");
+    }
+
+    return builder.ToString();
 }
 
 static string PlanDisplayName(IMembershipPlan plan)
