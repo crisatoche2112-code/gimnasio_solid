@@ -13,4 +13,12 @@
     <Compile Remove="GimnasioSolid\obj\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="QuestPDF" Version="2026.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="GimnasioSolid\Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
