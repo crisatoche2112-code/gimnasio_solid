@@ -22,31 +22,7 @@ builder.Services.AddSingleton<TurnstileController>();
 var app = builder.Build();
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 
-app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccessLogRepository accessLogs, IBillingService billingService) =>
-{
-    var allMembers = members.GetAll().ToList();
-    var totalRevenue = payments.GetAll().Sum(payment => payment.Amount);
-    var monthlyProjection = allMembers.Sum(member => billingService.CalculateMonthlyFee(member));
-    var allowedEntries = accessLogs.GetAll().Count(log => log.Allowed);
-
-    var content =
-        "<section class=\"hero\">" +
-        "<div><span class=\"eyebrow\">Panel principal</span><h2>Gimnasio SOLID</h2><p>Administra socios, valida accesos y registra pagos desde un tablero limpio y directo.</p></div>" +
-        "<div class=\"hero-actions\"><a class=\"primary-action\" href=\"/members\">Gestionar miembros</a><a class=\"secondary-action\" href=\"/access\">Validar acceso</a></div>" +
-        "</section>" +
-        "<section class=\"stats-grid\">" +
-        StatCard("Miembros activos", allMembers.Count.ToString(), "Socios registrados") +
-        StatCard("Ingresos registrados", Money(totalRevenue), "Pagos confirmados") +
-        StatCard("Proyeccion mensual", Money(monthlyProjection), "Segun planes actuales") +
-        StatCard("Accesos permitidos", allowedEntries.ToString(), "Historial de validacion") +
-        "</section>" +
-        "<section class=\"content-grid\">" +
-        "<article class=\"panel\"><h3>Operaciones rapidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a></div></article>" +
-        "<article class=\"panel\"><h3>Planes disponibles</h3><div class=\"plan-list\"><span>Estudiante - S/25.00</span><span>Regular - S/40.00</span><span>VIP - S/55.00</span><span>Fin de semana - S/20.00</span></div></article>" +
-        "</section>";
-
-    return Results.Content(PageLayout("Panel principal", "home", content), "text/html");
-});
+app.MapGet("/", () => Results.Content(PageLayout("Gimnasio SOLID", "<a class=\"button\" href=\"/members\">Gestión de miembros</a><a class=\"button\" href=\"/access\">Validación de acceso</a><a class=\"button\" href=\"/billing\">Facturación y reportes</a>", "<section class=\"hero\"><p>Bienvenido al sistema web de gestión del gimnasio. Aquí puedes administrar miembros, validar accesos con QR o huella y llevar el control de pagos.</p><div class=\"hero-actions\"><a class=\"button\" href=\"/members\">Ver miembros</a><a class=\"button\" href=\"/access\">Validar acceso</a><a class=\"button\" href=\"/billing\">Ver facturación</a></div></section>"), "text/html"));
 
 app.MapGet("/members", (IMemberRepository repository) =>
 {
@@ -68,22 +44,17 @@ app.MapGet("/members", (IMemberRepository repository) =>
         rows.Append("<tr><td colspan=\"4\" class=\"empty-state\">No hay miembros registrados.</td></tr>");
     }
 
-    var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Gestion de miembros</h2><p>Consulta socios activos y registra nuevas credenciales de acceso.</p></section>" +
-        "<section class=\"content-grid two-columns\">" +
-        "<article class=\"panel wide\"><div class=\"panel-title\"><h3>Listado de miembros</h3><span class=\"counter\">" + members.Count + " registrados</span></div>" +
-        "<div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiracion</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
-        "<article class=\"panel\"><h3>Crear nuevo miembro</h3>" +
-        "<form class=\"stacked-form\" method=\"post\" action=\"/members\">" +
-        "<label>ID<input name=\"id\" required placeholder=\"Ej. E500\" /></label>" +
-        "<label>Nombre<input name=\"name\" required placeholder=\"Nombre completo\" /></label>" +
-        "<label>QR acceso<input name=\"accessKey\" required placeholder=\"Codigo QR\" /></label>" +
-        "<label>Huella<input name=\"fingerprint\" required placeholder=\"Firma de huella\" /></label>" +
-        "<label>Plan<select name=\"plan\"><option value=\"student\">Estudiante</option><option value=\"regular\">Regular</option><option value=\"vip\">VIP</option><option value=\"weekend\">Fin de semana</option></select></label>" +
-        "<button type=\"submit\">Agregar miembro</button></form></article>" +
-        "</section>";
+    var content = $"<h2>Gestión de miembros</h2><p class=\"summary\">Miembros registrados: {repository.GetAll().Count()}</p><section class=\"card\"><h3>Listado de miembros</h3><table class=\"data-table\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr>{rows}</table></section>" +
+                  "<section class=\"card\"><h3>Crear nuevo miembro</h3><p>Completa los datos del nuevo socio. El campo <strong>QR acceso</strong> se usará para validar con el lector QR, y el campo <strong>Huella</strong> se usará para validar con el lector de huella.</p>" +
+                  "<form method=\"post\" action=\"/members\">" +
+                  "<label>ID:<input name=\"id\" required /></label>" +
+                  "<label>Nombre:<input name=\"name\" required /></label>" +
+                  "<label>QR acceso:<input name=\"accessKey\" required /></label>" +
+                  "<label>Huella:<input name=\"fingerprint\" required /></label>" +
+                  "<label>Plan:<select name=\"plan\"><option value=\"student\">Estudiante</option><option value=\"regular\">Regular</option><option value=\"vip\">VIP</option><option value=\"weekend\">Fin de semana</option></select></label>" +
+                  "<button type=\"submit\">Agregar miembro</button></form></section>";
 
-    return Results.Content(PageLayout("Gestion de miembros", "members", content), "text/html");
+    return Results.Content(PageLayout("Gestión de miembros", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
 });
 
 app.MapPost("/members", async (HttpRequest request, IMemberRepository repository) =>
@@ -108,142 +79,142 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
     return Results.Redirect("/members");
 });
 
-app.MapGet("/access", (IMemberRepository members, IAccessLogRepository accessLogs) =>
-{
-    return Results.Content(PageLayout("Validacion de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
-});
+app.MapGet("/access", () => Results.Content(PageLayout("Validación de acceso", "<a class=\"button\" href=\"/\">Menú principal</a>", "<h2>Validación de acceso</h2><p>Valida el ingreso de un miembro usando su credencial guardada. Elige el tipo de lector y presenta el dato correspondiente.</p><section class=\"info-box\"><strong>Cómo funciona:</strong><ul><li>Para <strong>QR</strong>: ingresa el valor exacto de <strong>QR acceso</strong> del miembro.</li><li>Para <strong>Huella</strong>: ingresa el valor de <strong>Huella</strong>. No importa si lo escribes en minúsculas.</li><li>El sistema busca el miembro y verifica si la credencial coincide con sus datos.</li></ul></section><form method=\"post\" action=\"/access\"><label>Datos presentados:<input name=\"presentedData\" required /></label><label>Lector:<select name=\"scanner\"><option value=\"qr\">QR</option><option value=\"fingerprint\">Huella</option></select></label><button type=\"submit\">Validar acceso</button></form>"), "text/html"));
 
 app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
 {
     var form = await request.ReadFormAsync();
-    var readerOutput = form["readerOutput"].ToString();
-    var readerType = form["readerType"].ToString();
-    var readerName = readerType == "fingerprint" ? "Huella biometrica" : "Codigo QR";
-    IAccessScanner activeScanner = readerType == "fingerprint"
-        ? new FingerprintScanner()
-        : new QrCodeScanner();
+    var presentedData = form["presentedData"].ToString();
+    var scanner = form["scanner"].ToString();
 
-    accessControl.SetScanner(activeScanner);
-    var normalizedCredential = activeScanner.Scan(readerOutput);
+    if (scanner == "qr")
+    {
+        accessControl.SetScanner(new QrCodeScanner());
+    }
+    else
+    {
+        accessControl.SetScanner(new FingerprintScanner());
+    }
 
-    var member = repo.GetAll()
-        .FirstOrDefault(m =>
-            readerType == "qr"
-                ? m.AccessKey == normalizedCredential
-                : m.FingerprintSignature == normalizedCredential);
-
-    var allowed = accessControl.CanOpenDoor(member, readerOutput);
-    accessLogs.Save(new AccessLog(member?.Id, member?.Name, DateTime.Now, allowed, readerName, readerOutput));
-
-    var result =
-        "<section class=\"result-panel " + (allowed ? "allowed" : "denied") + "\">" +
-        "<span class=\"status-dot\"></span>" +
-        "<div><h2>" + (allowed ? "Acceso permitido" : "Acceso denegado") + "</h2>" +
-        "<p>" + (allowed
-            ? $"El lector {Enc(readerName)} devolvio una credencial valida para {Enc(member?.Name ?? "miembro")}."
-            : $"El lector {Enc(readerName)} devolvio una credencial que no coincide con ningun socio activo.") + "</p></div>" +
-        "</section>";
-
-    return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), repo.GetAll(), false)), "text/html");
+    var allowed = turnstile.ValidateEntry(presentedData);
+    var message = allowed ? "Acceso permitido" : "Acceso denegado";
+    var content = $"<h2>Resultado de acceso</h2><p>{message}</p><p><a href=\"/access\">Probar otro acceso</a></p>";
+    return Results.Content(PageLayout("Validación de acceso", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
 });
 
 app.MapGet("/billing", (HttpRequest request, IMemberRepository members, IPaymentRepository payments, IBillingService billingService) =>
 {
-    var allMembers = members.GetAll().OrderBy(member => member.Name).ToList();
-    var allPayments = payments.GetAll().OrderByDescending(payment => payment.Date).ToList();
     var memberRows = new StringBuilder();
-    var paymentRows = new StringBuilder();
-
-    foreach (var member in allMembers)
+    foreach (var member in members.GetAll())
     {
-        var planType = member.MembershipPlan.GetType().Name;
         var statusBadge = member.IsOverdue
-            ? "<span class=\"badge danger\">Vencido</span>"
-            : "<span class=\"badge success\">Activo</span>";
+            ? "<span class=\"badge badge-danger\">Vencido</span>"
+            : "<span class=\"badge badge-ok\">Activo</span>";
+        var fee = billingService.CalculateMonthlyFee(member);
         var rowClass = member.IsOverdue ? "member-row row-overdue" : "member-row";
-
-        memberRows.Append("<tr class=\"" + rowClass + "\" data-id=\"" + Enc(member.Id) + "\" data-name=\"" + Enc(member.Name.ToLowerInvariant()) + "\" data-plan=\"" + planType + "\" data-status=\"" + (member.IsOverdue ? "overdue" : "active") + "\" data-expiration=\"" + member.ExpirationDate.ToString("yyyy-MM-dd") + "\" onclick=\"selectMember('" + Enc(member.Id) + "')\">");
-        memberRows.Append($"<td><strong>{Enc(member.Id)}</strong></td>");
-        memberRows.Append($"<td>{Enc(member.Name)}</td>");
-        memberRows.Append($"<td>{PlanDisplayName(member.MembershipPlan)}</td>");
-        memberRows.Append($"<td>{statusBadge}</td>");
-        memberRows.Append($"<td>{member.ExpirationDate:dd/MM/yyyy}</td>");
-        memberRows.Append($"<td>{Money(billingService.CalculateMonthlyFee(member))}</td>");
-        memberRows.Append("</tr>");
+        var statusValue = member.IsOverdue ? "overdue" : "active";
+        var planType = member.MembershipPlan.GetType().Name;
+        memberRows.Append("<tr class=\"" + rowClass + "\" data-id=\"" + member.Id + "\" data-name=\"" + member.Name.ToLowerInvariant() + "\" data-plan=\"" + planType + "\" data-status=\"" + statusValue + "\" data-expiration=\"" + member.ExpirationDate.ToString("yyyy-MM-dd") + "\" onclick=\"selectMember('" + member.Id + "')\">" +
+            $"<td>{member.Id}</td><td>{member.Name}</td><td>{planType}</td><td>{statusBadge}</td><td>{member.ExpirationDate:yyyy-MM-dd}</td><td>${fee:0.00}</td></tr>");
     }
 
-    if (memberRows.Length == 0)
+    var paymentRows = new StringBuilder();
+    foreach (var payment in payments.GetAll().OrderByDescending(p => p.Date))
     {
-        memberRows.Append("<tr><td colspan=\"6\" class=\"empty-state\">No hay miembros registrados.</td></tr>");
+        var lateFeeText = payment.LateFee > 0 ? $"${payment.LateFee:0.00}" : "-";
+        var downloadLink = $"<a class=\"link-download\" href=\"/billing/receipt/{payment.ReceiptNumber}\" target=\"_blank\">Descargar PDF</a>";
+        paymentRows.Append($"<tr><td>{payment.Date:yyyy-MM-dd HH:mm}</td><td>{payment.MemberName}</td><td>{payment.PlanName}</td><td>${payment.BaseAmount:0.00}</td><td>{lateFeeText}</td><td>${payment.Amount:0.00}</td><td>{payment.PaymentMethod}</td><td>{payment.ReceiptNumber}</td><td>{downloadLink}</td></tr>");
     }
 
-    foreach (var payment in allPayments)
+    var banner = "";
+    var status = request.Query["status"].ToString();
+    if (status == "ok")
     {
-        var lateFeeText = payment.LateFee > 0 ? Money(payment.LateFee) : "-";
-        var receipt = Enc(payment.ReceiptNumber);
-        var downloadLink = $"<a class=\"link-download\" href=\"/billing/receipt/{receipt}\" target=\"_blank\">Descargar PDF</a>";
-
-        paymentRows.Append("<tr>");
-        paymentRows.Append($"<td>{payment.Date:dd/MM/yyyy HH:mm}</td>");
-        paymentRows.Append($"<td>{Enc(payment.MemberName)}</td>");
-        paymentRows.Append($"<td>{Enc(payment.PlanName)}</td>");
-        paymentRows.Append($"<td>{Money(payment.BaseAmount)}</td>");
-        paymentRows.Append($"<td>{lateFeeText}</td>");
-        paymentRows.Append($"<td>{Money(payment.Amount)}</td>");
-        paymentRows.Append($"<td>{Enc(payment.PaymentMethod)}</td>");
-        paymentRows.Append($"<td>{receipt}</td>");
-        paymentRows.Append($"<td>{downloadLink}</td>");
-        paymentRows.Append("</tr>");
+        var amount = request.Query["amount"].ToString();
+        var receipt = request.Query["receipt"].ToString();
+        banner = $"<section class=\"info-box\"><strong>Pago registrado correctamente.</strong> Comprobante {receipt} por ${amount}. La membresía fue renovada. <a class=\"link-download\" href=\"/billing/receipt/{receipt}\" target=\"_blank\">Descargar comprobante en PDF</a></section>";
     }
-
-    if (paymentRows.Length == 0)
+    else if (status == "notfound")
     {
-        paymentRows.Append("<tr><td colspan=\"9\" class=\"empty-state\">Todavia no hay pagos registrados.</td></tr>");
+        banner = "<section class=\"info-box\"><strong>No se encontró ningún miembro con ese ID.</strong> Verifica el dato e inténtalo nuevamente.</section>";
     }
+    //Filtros de Miembros,estado y tarifa
+    var filterBar = "<div class=\"filter-bar\">" +
+                     "<input type=\"text\" id=\"filterText\" placeholder=\"Buscar por ID o nombre...\" oninput=\"filterMembers()\" />" +
+                     "<select id=\"filterPlan\" onchange=\"filterMembers()\">" +
+                     "<option value=\"\">Todos los planes</option>" +
+                     "<option value=\"StudentMembership\">Estudiante</option>" +
+                     "<option value=\"RegularMembership\">Regular</option>" +
+                     "<option value=\"VipMembership\">VIP</option>" +
+                     "<option value=\"WeekendMembership\">Fin de semana</option>" +
+                     "</select>" +
+                     "<select id=\"filterStatus\" onchange=\"filterMembers()\">" +
+                     "<option value=\"\">Todos los estados</option>" +
+                     "<option value=\"active\">Activo</option>" +
+                     "<option value=\"overdue\">Vencido</option>" +
+                     "</select>" +
+                     "<label class=\"filter-date\">Vence desde:<input type=\"date\" id=\"filterFrom\" onchange=\"filterMembers()\" /></label>" +
+                     "<label class=\"filter-date\">Vence hasta:<input type=\"date\" id=\"filterTo\" onchange=\"filterMembers()\" /></label>" +
+                     "<button type=\"button\" class=\"button-secondary\" onclick=\"clearMemberFilters()\">Limpiar filtros</button>" +
+                     "</div>";
 
-    var banner = BillingBanner(request);
-    var filterBar =
-        "<div class=\"filter-bar\">" +
-        "<input type=\"text\" id=\"filterText\" placeholder=\"Buscar por ID o nombre...\" oninput=\"filterMembers()\" />" +
-        "<select id=\"filterPlan\" onchange=\"filterMembers()\">" +
-        "<option value=\"\">Todos los planes</option>" +
-        "<option value=\"StudentMembership\">Estudiante</option>" +
-        "<option value=\"RegularMembership\">Regular</option>" +
-        "<option value=\"VipMembership\">VIP</option>" +
-        "<option value=\"WeekendMembership\">Fin de semana</option>" +
-        "</select>" +
-        "<select id=\"filterStatus\" onchange=\"filterMembers()\">" +
-        "<option value=\"\">Todos los estados</option>" +
-        "<option value=\"active\">Activo</option>" +
-        "<option value=\"overdue\">Vencido</option>" +
-        "</select>" +
-        "<label class=\"filter-date\">Vence desde<input type=\"date\" id=\"filterFrom\" onchange=\"filterMembers()\" /></label>" +
-        "<label class=\"filter-date\">Vence hasta<input type=\"date\" id=\"filterTo\" onchange=\"filterMembers()\" /></label>" +
-        "<button type=\"button\" class=\"button-secondary\" onclick=\"clearMemberFilters()\">Limpiar filtros</button>" +
-        "</div>";
+    var content = "<h2>Facturación y reportes</h2>" +
+                  banner +
+                  $"<p class=\"summary\">Miembros registrados: {members.GetAll().Count()} • Pagos realizados: {payments.GetAll().Count()}</p><p>Consulta las tarifas mensuales de cada miembro y registra pagos con facilidad. Los pagos atrasados (en rojo) incluyen un recargo por mora del 10%. Haz clic en una fila para autocompletar el ID en el formulario de pago.</p>" +
+                  "<section class=\"card\"><h3>Miembros, estado y tarifa mensual</h3>" +
+                  filterBar +
+                  $"<table class=\"data-table\" id=\"membersTable\"><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Vence</th><th>Cuota a pagar</th></tr>{memberRows}</table>" +
+                  "<p id=\"noResults\" class=\"no-results\" style=\"display:none;\">No hay miembros que coincidan con los filtros.</p>" +
+                  "</section>" +
+                  "<section class=\"card\"><h3>Registrar pago</h3>" +
+                  "<form method=\"post\" action=\"/billing/pay\">" +
+                  "<label>ID del miembro:<input id=\"memberIdInput\" name=\"memberId\" required style=\"width:100%; padding:12px 15px; margin-top:8px; border:1px solid #cbd5e1; border-radius:12px; background:#f8fafc; font-size:15px; box-sizing:border-box;\" /></label>" +
+                  "<label>Tipo de pago:<select name=\"paymentMethod\">" +
+                  "<option value=\"Efectivo\">Efectivo</option>" +
+                  "<option value=\"Tarjeta\">Tarjeta</option>" +
+                  "<option value=\"Billetera digital\">Billetera digital</option>" +
+                  "</select></label>" +
+                  "<button type=\"submit\">Registrar pago</button></form></section>" +
+                  "<section class=\"card\"><h3>Historial de pagos</h3>" +
+                  $"<table class=\"data-table\"><tr><th>Fecha</th><th>Miembro</th><th>Plan</th><th>Cuota</th><th>Mora</th><th>Total</th><th>Tipo de pago</th><th>Comprobante</th><th>Descarga</th></tr>{paymentRows}</table></section>" +
+                  "<script>" +
+                  "function selectMember(id){document.getElementById('memberIdInput').value=id;document.getElementById('memberIdInput').scrollIntoView({behavior:'smooth',block:'center'});}" +
+                  "function filterMembers(){" +
+                  "var text=document.getElementById('filterText').value.trim().toLowerCase();" +
+                  "var plan=document.getElementById('filterPlan').value;" +
+                  "var status=document.getElementById('filterStatus').value;" +
+                  "var from=document.getElementById('filterFrom').value;" +
+                  "var to=document.getElementById('filterTo').value;" +
+                  "var rows=document.querySelectorAll('#membersTable .member-row');" +
+                  "var visibleCount=0;" +
+                  "rows.forEach(function(row){" +
+                  "var id=row.dataset.id.toLowerCase();" +
+                  "var name=row.dataset.name;" +
+                  "var rowPlan=row.dataset.plan;" +
+                  "var rowStatus=row.dataset.status;" +
+                  "var exp=row.dataset.expiration;" +
+                  "var visible=true;" +
+                  "if(text && id.indexOf(text)===-1 && name.indexOf(text)===-1){visible=false;}" +
+                  "if(plan && rowPlan!==plan){visible=false;}" +
+                  "if(status && rowStatus!==status){visible=false;}" +
+                  "if(from && exp<from){visible=false;}" +
+                  "if(to && exp>to){visible=false;}" +
+                  "row.style.display=visible?'':'none';" +
+                  "if(visible){visibleCount++;}" +
+                  "});" +
+                  "document.getElementById('noResults').style.display=visibleCount===0?'':'none';" +
+                  "}" +
+                  "function clearMemberFilters(){" +
+                  "document.getElementById('filterText').value='';" +
+                  "document.getElementById('filterPlan').value='';" +
+                  "document.getElementById('filterStatus').value='';" +
+                  "document.getElementById('filterFrom').value='';" +
+                  "document.getElementById('filterTo').value='';" +
+                  "filterMembers();" +
+                  "}" +
+                  "</script>";
 
-    var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Facturacion</span><h2>Pagos y reportes</h2><p>Revisa cuotas mensuales, registra pagos y consulta el historial financiero.</p></section>" +
-        banner +
-        "<section class=\"stats-grid compact\">" +
-        StatCard("Miembros", allMembers.Count.ToString(), "Con plan vigente") +
-        StatCard("Pagos", allPayments.Count.ToString(), "Transacciones guardadas") +
-        StatCard("Total cobrado", Money(allPayments.Sum(payment => payment.Amount)), "Ingresos registrados") +
-        "</section>" +
-        "<section class=\"content-grid two-columns\">" +
-        "<article class=\"panel wide\"><h3>Miembros, estado y tarifa mensual</h3>" +
-        filterBar +
-        "<div class=\"table-wrap\"><table class=\"data-table\" id=\"membersTable\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Vence</th><th>Cuota a pagar</th></tr></thead><tbody>" + memberRows + "</tbody></table></div>" +
-        "<p id=\"noResults\" class=\"no-results\" style=\"display:none;\">No hay miembros que coincidan con los filtros.</p></article>" +
-        "<article class=\"panel\"><h3>Registrar pago</h3><form class=\"stacked-form\" method=\"post\" action=\"/billing/pay\">" +
-        "<label>ID del miembro<input id=\"memberIdInput\" name=\"memberId\" required placeholder=\"Ej. A100\" /></label>" +
-        "<label>Tipo de pago<select name=\"paymentMethod\"><option value=\"Efectivo\">Efectivo</option><option value=\"Tarjeta\">Tarjeta</option><option value=\"Billetera digital\">Billetera digital</option></select></label>" +
-        "<button type=\"submit\">Registrar pago</button></form></article>" +
-        "</section>" +
-        "<section class=\"panel\"><h3>Historial de pagos</h3><div class=\"table-wrap\"><table class=\"data-table payment-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Plan</th><th>Cuota</th><th>Mora</th><th>Total</th><th>Tipo de pago</th><th>Comprobante</th><th>Descarga</th></tr></thead><tbody>" + paymentRows + "</tbody></table></div></section>" +
-        BillingScripts();
-
-    return Results.Content(PageLayout("Facturacion y reportes", "billing", content), "text/html");
+    return Results.Content(PageLayout("Facturación y reportes", "<a class=\"button\" href=\"/\">Menú principal</a>", content), "text/html");
 });
 
 app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository members, IBillingService billingService) =>
@@ -258,7 +229,7 @@ app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository member
     }
 
     var receipt = billingService.RegisterMonthlyPayment(member, paymentMethod);
-    return Results.Redirect($"/billing?status=ok&amount={receipt.Amount:0.00}&receipt={Uri.EscapeDataString(receipt.ReceiptNumber)}");
+    return Results.Redirect($"/billing?status=ok&amount={receipt.BaseAmount:0.00}&receipt={receipt.ReceiptNumber}");
 });
 
 app.MapGet("/billing/receipt/{receiptNumber}", (string receiptNumber, IPaymentRepository payments, IReceiptPdfGenerator receiptPdfGenerator) =>
@@ -266,7 +237,7 @@ app.MapGet("/billing/receipt/{receiptNumber}", (string receiptNumber, IPaymentRe
     var payment = payments.GetByReceiptNumber(receiptNumber);
     if (payment is null)
     {
-        return Results.NotFound("No se encontro ningun comprobante con ese numero.");
+        return Results.NotFound("No se encontró ningún comprobante con ese número.");
     }
 
     var pdfBytes = receiptPdfGenerator.Generate(payment);
@@ -275,646 +246,9 @@ app.MapGet("/billing/receipt/{receiptNumber}", (string receiptNumber, IPaymentRe
 
 app.Run();
 
-static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> members, bool includeHeading = true)
+static string PageLayout(string title, string navigation, string content)
 {
-    var rows = new StringBuilder();
-    var exampleRows = new StringBuilder();
-
-    foreach (var member in members.OrderBy(member => member.Name))
-    {
-        exampleRows.Append("<tr>");
-        exampleRows.Append($"<td>{Enc(member.Name)}</td>");
-        exampleRows.Append($"<td><code>{Enc(member.AccessKey)}</code></td>");
-        exampleRows.Append($"<td><code>{Enc(member.FingerprintSignature)}</code></td>");
-        exampleRows.Append("</tr>");
-    }
-
-    if (exampleRows.Length == 0)
-    {
-        exampleRows.Append("<tr><td colspan=\"3\" class=\"empty-state\">No hay socios para simular credenciales.</td></tr>");
-    }
-
-    foreach (var log in logs.OrderByDescending(log => log.Timestamp).Take(8))
-    {
-        rows.Append("<tr>");
-        rows.Append($"<td>{log.Timestamp:dd/MM/yyyy HH:mm}</td>");
-        rows.Append($"<td>{Enc(log.MemberName ?? "No identificado")}</td>");
-        rows.Append($"<td>{Enc(log.ScannerType)}</td>");
-        rows.Append($"<td><span class=\"badge {(log.Allowed ? "success" : "danger")}\">{(log.Allowed ? "Permitido" : "Denegado")}</span></td>");
-        rows.Append("</tr>");
-    }
-
-    if (rows.Length == 0)
-    {
-        rows.Append("<tr><td colspan=\"4\" class=\"empty-state\">Aun no hay validaciones registradas.</td></tr>");
-    }
-
-    var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validacion de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
-        : string.Empty;
-
-    return heading +
-        "<section class=\"content-grid two-columns\">" +
-        "<article class=\"panel\"><h3>Simular lectura</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
-        "<label>Salida del lector<input name=\"readerOutput\" required placeholder=\"Ej. A100 o FP-A100\" /></label>" +
-        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Camara / lector QR</option><option value=\"fingerprint\">Lector biometrico de huella</option></select></label>" +
-        "<button type=\"submit\">Validar acceso</button></form></article>" +
-        "<article class=\"panel wide\"><h3>Credenciales simuladas</h3><div class=\"table-wrap\"><table class=\"data-table compact-table\"><thead><tr><th>Socio</th><th>Salida QR</th><th>Salida huella</th></tr></thead><tbody>" + exampleRows + "</tbody></table></div></article>" +
-        "</section>" +
-        "<section class=\"panel\"><h3>Historial reciente</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Lector</th><th>Estado</th></tr></thead><tbody>" + rows + "</tbody></table></div></section>";
-}
-
-static string BillingBanner(HttpRequest request)
-{
-    var status = request.Query["status"].ToString();
-    if (status == "ok")
-    {
-        var amount = Enc(request.Query["amount"].ToString());
-        var receipt = Enc(request.Query["receipt"].ToString());
-        return $"<section class=\"info-box\"><strong>Pago registrado correctamente.</strong> Comprobante {receipt} por S/{amount}. La membresia fue renovada. <a class=\"link-download\" href=\"/billing/receipt/{receipt}\" target=\"_blank\">Descargar comprobante en PDF</a></section>";
-    }
-
-    if (status == "notfound")
-    {
-        return "<section class=\"info-box danger-box\"><strong>No se encontro ningun miembro con ese ID.</strong> Verifica el dato e intentalo nuevamente.</section>";
-    }
-
-    return string.Empty;
-}
-
-static string BillingScripts()
-{
-    return """
-        <script>
-        function selectMember(id){
-            document.getElementById('memberIdInput').value=id;
-            document.getElementById('memberIdInput').scrollIntoView({behavior:'smooth',block:'center'});
-        }
-        function filterMembers(){
-            var text=document.getElementById('filterText').value.trim().toLowerCase();
-            var plan=document.getElementById('filterPlan').value;
-            var status=document.getElementById('filterStatus').value;
-            var from=document.getElementById('filterFrom').value;
-            var to=document.getElementById('filterTo').value;
-            var rows=document.querySelectorAll('#membersTable .member-row');
-            var visibleCount=0;
-            rows.forEach(function(row){
-                var id=row.dataset.id.toLowerCase();
-                var name=row.dataset.name;
-                var rowPlan=row.dataset.plan;
-                var rowStatus=row.dataset.status;
-                var exp=row.dataset.expiration;
-                var visible=true;
-                if(text && id.indexOf(text)===-1 && name.indexOf(text)===-1){visible=false;}
-                if(plan && rowPlan!==plan){visible=false;}
-                if(status && rowStatus!==status){visible=false;}
-                if(from && exp<from){visible=false;}
-                if(to && exp>to){visible=false;}
-                row.style.display=visible?'':'none';
-                if(visible){visibleCount++;}
-            });
-            document.getElementById('noResults').style.display=visibleCount===0?'':'none';
-        }
-        function clearMemberFilters(){
-            document.getElementById('filterText').value='';
-            document.getElementById('filterPlan').value='';
-            document.getElementById('filterStatus').value='';
-            document.getElementById('filterFrom').value='';
-            document.getElementById('filterTo').value='';
-            filterMembers();
-        }
-        </script>
-        """;
-}
-
-static string PageLayout(string title, string activeSection, string content)
-{
-    var navigation =
-        NavLink("/", "Inicio", activeSection == "home") +
-        NavLink("/members", "Miembros", activeSection == "members") +
-        NavLink("/access", "Acceso", activeSection == "access") +
-        NavLink("/billing", "Facturacion", activeSection == "billing");
-
-    return "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
-        $"<title>{Enc(title)} | Gimnasio SOLID</title><style>{CssStyles()}</style></head>" +
-        "<body><div class=\"app-shell\"><header><div class=\"topbar\">" +
-        "<a class=\"brand\" href=\"/\"><span class=\"brand-mark\">GS</span><span><strong>Gimnasio SOLID</strong><span>Control operativo</span></span></a>" +
-        $"<nav aria-label=\"Navegacion principal\">{navigation}</nav></div></header><main>{content}</main></div></body></html>";
-}
-
-static string CssStyles()
-{
-    return """
-        :root {
-            color-scheme: light;
-            --ink: #172033;
-            --muted: #647084;
-            --line: #dfe6f0;
-            --surface: #ffffff;
-            --surface-soft: #f6f8fb;
-            --brand: #116149;
-            --brand-dark: #0b4635;
-            --accent: #d88b18;
-            --danger: #b42318;
-            --success: #138a54;
-            --shadow: 0 18px 38px rgba(23, 32, 51, .08);
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: Inter, "Segoe UI", Arial, sans-serif;
-            background: var(--surface-soft);
-            color: var(--ink);
-        }
-
-        a { color: inherit; }
-
-        header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--line);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .topbar {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 210px;
-            text-decoration: none;
-        }
-
-        .brand-mark {
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
-            display: grid;
-            place-items: center;
-            background: var(--brand);
-            color: #fff;
-            font-weight: 800;
-        }
-
-        .brand strong { display: block; font-size: 1rem; }
-        .brand span span { color: var(--muted); font-size: .84rem; }
-
-        nav {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-
-        nav a {
-            text-decoration: none;
-            padding: 10px 13px;
-            border-radius: 8px;
-            color: var(--muted);
-            font-weight: 700;
-            font-size: .92rem;
-        }
-
-        nav a.active,
-        nav a:hover {
-            background: #eaf4ef;
-            color: var(--brand-dark);
-        }
-
-        main {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 28px 24px 44px;
-        }
-
-        .hero {
-            min-height: 260px;
-            display: grid;
-            grid-template-columns: minmax(0, 1.3fr) auto;
-            align-items: end;
-            gap: 28px;
-            padding: 36px;
-            border-radius: 8px;
-            color: #fff;
-            background:
-                linear-gradient(110deg, rgba(11, 70, 53, .96), rgba(17, 97, 73, .78)),
-                url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1600&q=80") center/cover;
-            box-shadow: var(--shadow);
-        }
-
-        .hero h2,
-        .page-heading h2,
-        .result-panel h2 {
-            margin: 6px 0 10px;
-            font-size: clamp(2rem, 5vw, 4rem);
-            line-height: 1;
-        }
-
-        .hero p,
-        .page-heading p,
-        .result-panel p {
-            margin: 0;
-            color: inherit;
-            max-width: 680px;
-            line-height: 1.65;
-        }
-
-        .hero-actions,
-        .quick-actions,
-        .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .primary-action,
-        .secondary-action,
-        button,
-        .quick-actions a {
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            border: 0;
-            padding: 0 16px;
-            font-weight: 800;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .primary-action,
-        button {
-            background: var(--brand);
-            color: #fff;
-        }
-
-        .primary-action:hover,
-        button:hover { background: var(--brand-dark); }
-
-        .secondary-action {
-            background: rgba(255, 255, 255, .14);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, .35);
-        }
-
-        .button-secondary {
-            background: #e2e8f0;
-            color: var(--ink);
-        }
-
-        .button-secondary:hover { background: #cbd5e1; }
-
-        .page-heading { padding: 16px 0 8px; }
-        .page-heading h2 { color: var(--ink); }
-        .page-heading p { color: var(--muted); }
-
-        .eyebrow {
-            display: inline-flex;
-            color: var(--accent);
-            font-size: .78rem;
-            font-weight: 900;
-            text-transform: uppercase;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 18px;
-        }
-
-        .stats-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-        .stat-card,
-        .panel {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            box-shadow: var(--shadow);
-        }
-
-        .stat-card { padding: 18px; }
-
-        .stat-card span,
-        .counter {
-            color: var(--muted);
-            font-size: .84rem;
-            font-weight: 700;
-        }
-
-        .stat-card strong {
-            display: block;
-            margin: 8px 0 4px;
-            font-size: 1.65rem;
-        }
-
-        .content-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
-            margin-top: 18px;
-        }
-
-        .content-grid.two-columns {
-            grid-template-columns: minmax(0, 1.45fr) minmax(320px, .75fr);
-        }
-
-        .panel {
-            padding: 22px;
-            overflow: hidden;
-            margin-top: 18px;
-        }
-
-        .content-grid .panel { margin-top: 0; }
-        .panel.wide { min-width: 0; }
-
-        .panel-title {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        h3 {
-            margin: 0 0 16px;
-            font-size: 1.08rem;
-        }
-
-        .quick-actions a {
-            background: #eef6f2;
-            color: var(--brand-dark);
-        }
-
-        .plan-list {
-            display: grid;
-            gap: 10px;
-            color: var(--muted);
-            font-weight: 700;
-        }
-
-        .stacked-form {
-            display: grid;
-            gap: 14px;
-        }
-
-        label {
-            display: grid;
-            gap: 7px;
-            color: var(--ink);
-            font-size: .9rem;
-            font-weight: 800;
-        }
-
-        input,
-        select {
-            width: 100%;
-            min-height: 44px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 0 12px;
-            background: #fff;
-            color: var(--ink);
-            font: inherit;
-        }
-
-        input:focus,
-        select:focus {
-            outline: 3px solid rgba(17, 97, 73, .16);
-            border-color: var(--brand);
-        }
-
-        .filter-bar {
-            align-items: end;
-            margin-bottom: 14px;
-        }
-
-        .filter-bar input,
-        .filter-bar select,
-        .filter-date {
-            flex: 1 1 150px;
-        }
-
-        .filter-date {
-            min-width: 150px;
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-        }
-
-        .data-table {
-            width: 100%;
-            min-width: 720px;
-            border-collapse: collapse;
-            font-size: .94rem;
-        }
-
-        .payment-table { min-width: 980px; }
-        .compact-table { min-width: 480px; }
-
-        .data-table th,
-        .data-table td {
-            padding: 13px 14px;
-            text-align: left;
-            border-bottom: 1px solid var(--line);
-        }
-
-        .data-table th {
-            background: #f8fafc;
-            color: var(--muted);
-            font-size: .78rem;
-            text-transform: uppercase;
-        }
-
-        .data-table tr:last-child td { border-bottom: 0; }
-        .member-row { cursor: pointer; }
-        .member-row:hover { background: #eef6f2; }
-        .row-overdue { background: #fff4f2; }
-        .row-overdue td { color: #7a271a; }
-
-        code {
-            display: inline-flex;
-            align-items: center;
-            min-height: 26px;
-            padding: 0 8px;
-            border-radius: 6px;
-            background: #edf2f7;
-            color: var(--brand-dark);
-            font-family: Consolas, "Courier New", monospace;
-            font-size: .88rem;
-            font-weight: 700;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            min-height: 28px;
-            padding: 0 10px;
-            border-radius: 999px;
-            background: #eef2f7;
-            color: var(--ink);
-            font-size: .8rem;
-            font-weight: 800;
-        }
-
-        .badge.success {
-            background: #e6f6ee;
-            color: var(--success);
-        }
-
-        .badge.danger {
-            background: #fdeceb;
-            color: var(--danger);
-        }
-
-        .info-box {
-            margin-top: 18px;
-            padding: 16px 18px;
-            border-radius: 8px;
-            border: 1px solid #bddfd0;
-            background: #eef8f3;
-            color: var(--brand-dark);
-            line-height: 1.55;
-        }
-
-        .danger-box {
-            border-color: #fac5bd;
-            background: #fff4f2;
-            color: var(--danger);
-        }
-
-        .link-download {
-            color: var(--brand-dark);
-            font-weight: 800;
-            text-decoration: none;
-        }
-
-        .link-download:hover { text-decoration: underline; }
-
-        .no-results {
-            color: var(--muted);
-            font-style: italic;
-            margin: 12px 0 0;
-        }
-
-        .result-panel {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-            padding: 24px;
-            border-radius: 8px;
-            color: #fff;
-            margin-bottom: 18px;
-        }
-
-        .result-panel.allowed { background: var(--success); }
-        .result-panel.denied { background: var(--danger); }
-
-        .status-dot {
-            width: 16px;
-            height: 16px;
-            flex: 0 0 auto;
-            border-radius: 999px;
-            background: #fff;
-            box-shadow: 0 0 0 8px rgba(255, 255, 255, .18);
-        }
-
-        .empty-state {
-            color: var(--muted);
-            text-align: center;
-        }
-
-        @media (max-width: 900px) {
-            .topbar,
-            .hero,
-            .content-grid,
-            .content-grid.two-columns {
-                grid-template-columns: 1fr;
-            }
-
-            .topbar { align-items: flex-start; }
-            nav { justify-content: flex-start; }
-
-            .stats-grid,
-            .stats-grid.compact {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 560px) {
-            .topbar,
-            main {
-                padding-left: 16px;
-                padding-right: 16px;
-            }
-
-            .brand { min-width: 0; }
-
-            nav a {
-                flex: 1 1 calc(50% - 8px);
-                text-align: center;
-            }
-
-            .hero {
-                min-height: 320px;
-                padding: 24px;
-            }
-
-            .stats-grid,
-            .stats-grid.compact {
-                grid-template-columns: 1fr;
-            }
-        }
-        """;
-}
-
-static string NavLink(string href, string text, bool active)
-{
-    return $"<a class=\"{(active ? "active" : string.Empty)}\" href=\"{href}\">{Enc(text)}</a>";
-}
-
-static string StatCard(string label, string value, string description)
-{
-    return $"<article class=\"stat-card\"><span>{Enc(label)}</span><strong>{Enc(value)}</strong><span>{Enc(description)}</span></article>";
-}
-
-static string PlanDisplayName(IMembershipPlan plan)
-{
-    return plan switch
-    {
-        StudentMembership => "Estudiante",
-        RegularMembership => "Regular",
-        VipMembership => "VIP",
-        WeekendMembership => "Fin de semana",
-        _ => plan.GetType().Name
-    };
-}
-
-static string Money(decimal amount)
-{
-    return $"S/{amount:0.00}";
-}
-
-static string Enc(string value)
-{
-    return WebUtility.HtmlEncode(value);
+    return $"<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>{title}</title><style>body{{font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,#eef5ff 0%,#f8fbff 100%);color:#102a43;margin:0;padding:0;}}header{{background:#0f4fa8;color:#fff;padding:24px 28px;box-shadow:0 20px 50px rgba(15,79,168,.18);}}header h1{{margin:0;font-size:2rem;letter-spacing:.02em;}}nav{{padding:18px 28px;background:#fff;border-bottom:1px solid #d9e4f5;display:flex;flex-wrap:wrap;gap:10px;}}nav a.button{{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;background:#0f4fa8;color:#fff;text-decoration:none;border-radius:12px;font-weight:600;transition:transform .15s ease,background .15s ease;}}nav a.button:hover{{transform:translateY(-1px);background:#0b3d85;}}main{{padding:28px;max-width:1100px;margin:auto;}}h2{{color:#102a43;margin-bottom:12px;}}h3{{color:#102a43;margin-bottom:10px;}}p{{line-height:1.75;margin:0 0 18px;}}section.card{{background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:24px;box-shadow:0 18px 40px rgba(16,42,67,.08);margin-top:22px;}}.hero{{background:#f1f7ff;border:1px solid #dce7fb;border-radius:24px;padding:28px;margin-top:22px;}}.hero-actions{{margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;}}.data-table{{width:100%;border-collapse:collapse;margin-top:16px;font-size:.98rem;}}.data-table th,.data-table td{{border:1px solid #e2e8f0;padding:14px;text-align:left;}}.data-table th{{background:#f1f5f9;color:#1e3a8a;}}label{{display:block;margin-bottom:16px;font-weight:700;color:#334155;}}input[type=text],select{{width:100%;padding:14px 16px;margin-top:8px;border:1px solid #cbd5e1;border-radius:14px;font-size:1rem;background:#f8fafc;}}button{{cursor:pointer;background:#0f4fa8;color:#fff;border:none;padding:14px 20px;border-radius:14px;font-size:1rem;font-weight:700;box-shadow:0 14px 30px rgba(15,79,168,.16);transition:transform .15s ease,background .15s ease;}}button:hover{{transform:translateY(-1px);background:#0b3d85;}}.summary{{margin-top:0;font-weight:700;color:#334155;}}.info-box{{background:#eef6ff;border-left:5px solid #0f4fa8;border-radius:14px;padding:18px 20px;margin-bottom:22px;color:#102a43;}}.badge{{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.85rem;font-weight:700;}}.badge-ok{{background:#dcfce7;color:#166534;}}.badge-danger{{background:#fee2e2;color:#991b1b;}}.filter-bar{{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}}.filter-bar input[type=text],.filter-bar select,.filter-bar input[type=date]{{width:auto;margin-top:0;padding:10px 12px;font-size:.92rem;}}.filter-bar label.filter-date{{display:flex;align-items:center;gap:6px;font-weight:600;color:#334155;font-size:.9rem;margin-bottom:0;}}.button-secondary{{background:#e2e8f0;color:#1e293b;border:none;padding:10px 16px;border-radius:12px;font-weight:700;cursor:pointer;}}.button-secondary:hover{{background:#cbd5e1;}}.member-row{{cursor:pointer;}}.member-row:hover{{background:#eef6ff;}}.row-overdue{{background:#fee2e2;}}.row-overdue:hover{{background:#fecaca;}}.row-overdue td{{color:#7f1d1d;}}.no-results{{color:#64748b;font-style:italic;margin-top:12px;}}.link-download{{color:#0f4fa8;font-weight:700;text-decoration:none;}}.link-download:hover{{text-decoration:underline;}}ul{{margin:12px 0 0 20px;padding:0;}}ul li{{margin-bottom:10px;}}@media(max-width:720px){{main{{padding:18px;}}nav{{justify-content:center;}}section.card, .hero{{padding:20px;}}input[type=text],select,button{{font-size:.98rem;}}}}</style></head><body><header><h1>{title}</h1></header><nav>{navigation}</nav><main>{content}</main></body></html>";
 }
 
 static void SeedMembers(IMemberRepository repository)
