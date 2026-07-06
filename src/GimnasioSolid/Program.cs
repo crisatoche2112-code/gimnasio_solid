@@ -248,7 +248,7 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> 
     }
 
     var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Prototipo de lectores</span><h2>Validación de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
+        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validación de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
         : string.Empty;
 
     return heading +
