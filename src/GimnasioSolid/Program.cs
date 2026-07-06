@@ -6,19 +6,23 @@ using GimnasioSolid.Models;
 using GimnasioSolid.Repositories;
 using GimnasioSolid.Scanners;
 using GimnasioSolid.Services;
+using QuestPDF.Infrastructure;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IMemberRepository, MemberRepository>();
 builder.Services.AddSingleton<IPaymentRepository, PaymentRepository>();
 builder.Services.AddSingleton<IAccessLogRepository, AccessLogRepository>();
-builder.Services.AddSingleton<BillingService>();
+builder.Services.AddSingleton<IBillingService, BillingService>();
+builder.Services.AddSingleton<IReceiptPdfGenerator, ReceiptPdfGenerator>();
 builder.Services.AddSingleton<AccessControl>(sp => new AccessControl(new QrCodeScanner()));
 builder.Services.AddSingleton<TurnstileController>();
 
 var app = builder.Build();
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 
-app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccessLogRepository accessLogs, BillingService billingService) =>
+app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccessLogRepository accessLogs, IBillingService billingService) =>
 {
     var allMembers = members.GetAll().ToList();
     var totalRevenue = payments.GetAll().Sum(payment => payment.Amount);
@@ -33,12 +37,12 @@ app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccess
         "<section class=\"stats-grid\">" +
         StatCard("Miembros activos", allMembers.Count.ToString(), "Socios registrados") +
         StatCard("Ingresos registrados", Money(totalRevenue), "Pagos confirmados") +
-        StatCard("Proyección mensual", Money(monthlyProjection), "Según planes actuales") +
-        StatCard("Accesos permitidos", allowedEntries.ToString(), "Historial de validación") +
+        StatCard("Proyeccion mensual", Money(monthlyProjection), "Segun planes actuales") +
+        StatCard("Accesos permitidos", allowedEntries.ToString(), "Historial de validacion") +
         "</section>" +
         "<section class=\"content-grid\">" +
-        "<article class=\"panel\"><h3>Operaciones rápidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a></div></article>" +
-        "<article class=\"panel\"><h3>Planes disponibles</h3><div class=\"plan-list\"><span>Estudiante · S/25.00</span><span>Regular · S/40.00</span><span>VIP · S/55.00</span><span>Fin de semana · S/20.00</span></div></article>" +
+        "<article class=\"panel\"><h3>Operaciones rapidas</h3><div class=\"quick-actions\"><a href=\"/members\">Nuevo miembro</a><a href=\"/access\">Control de puerta</a><a href=\"/billing\">Registrar pago</a></div></article>" +
+        "<article class=\"panel\"><h3>Planes disponibles</h3><div class=\"plan-list\"><span>Estudiante - S/25.00</span><span>Regular - S/40.00</span><span>VIP - S/55.00</span><span>Fin de semana - S/20.00</span></div></article>" +
         "</section>";
 
     return Results.Content(PageLayout("Panel principal", "home", content), "text/html");
@@ -65,21 +69,21 @@ app.MapGet("/members", (IMemberRepository repository) =>
     }
 
     var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Gestión de miembros</h2><p>Consulta socios activos y registra nuevas credenciales de acceso.</p></section>" +
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Miembros</span><h2>Gestion de miembros</h2><p>Consulta socios activos y registra nuevas credenciales de acceso.</p></section>" +
         "<section class=\"content-grid two-columns\">" +
         "<article class=\"panel wide\"><div class=\"panel-title\"><h3>Listado de miembros</h3><span class=\"counter\">" + members.Count + " registrados</span></div>" +
-        "<div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiración</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
+        "<div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Expiracion</th></tr></thead><tbody>" + rows + "</tbody></table></div></article>" +
         "<article class=\"panel\"><h3>Crear nuevo miembro</h3>" +
         "<form class=\"stacked-form\" method=\"post\" action=\"/members\">" +
         "<label>ID<input name=\"id\" required placeholder=\"Ej. E500\" /></label>" +
         "<label>Nombre<input name=\"name\" required placeholder=\"Nombre completo\" /></label>" +
-        "<label>QR acceso<input name=\"accessKey\" required placeholder=\"Código QR\" /></label>" +
+        "<label>QR acceso<input name=\"accessKey\" required placeholder=\"Codigo QR\" /></label>" +
         "<label>Huella<input name=\"fingerprint\" required placeholder=\"Firma de huella\" /></label>" +
         "<label>Plan<select name=\"plan\"><option value=\"student\">Estudiante</option><option value=\"regular\">Regular</option><option value=\"vip\">VIP</option><option value=\"weekend\">Fin de semana</option></select></label>" +
         "<button type=\"submit\">Agregar miembro</button></form></article>" +
         "</section>";
 
-    return Results.Content(PageLayout("Gestión de miembros", "members", content), "text/html");
+    return Results.Content(PageLayout("Gestion de miembros", "members", content), "text/html");
 });
 
 app.MapPost("/members", async (HttpRequest request, IMemberRepository repository) =>
@@ -106,7 +110,7 @@ app.MapPost("/members", async (HttpRequest request, IMemberRepository repository
 
 app.MapGet("/access", (IMemberRepository members, IAccessLogRepository accessLogs) =>
 {
-    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
+    return Results.Content(PageLayout("Validacion de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
 });
 
 app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
@@ -114,7 +118,7 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
     var form = await request.ReadFormAsync();
     var readerOutput = form["readerOutput"].ToString();
     var readerType = form["readerType"].ToString();
-    var readerName = readerType == "fingerprint" ? "Huella biométrica" : "Código QR";
+    var readerName = readerType == "fingerprint" ? "Huella biometrica" : "Codigo QR";
     IAccessScanner activeScanner = readerType == "fingerprint"
         ? new FingerprintScanner()
         : new QrCodeScanner();
@@ -126,8 +130,7 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
         .FirstOrDefault(m =>
             readerType == "qr"
                 ? m.AccessKey == normalizedCredential
-                : m.FingerprintSignature == normalizedCredential
-        );
+                : m.FingerprintSignature == normalizedCredential);
 
     var allowed = accessControl.CanOpenDoor(member, readerOutput);
     accessLogs.Save(new AccessLog(member?.Id, member?.Name, DateTime.Now, allowed, readerName, readerOutput));
@@ -137,14 +140,14 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
         "<span class=\"status-dot\"></span>" +
         "<div><h2>" + (allowed ? "Acceso permitido" : "Acceso denegado") + "</h2>" +
         "<p>" + (allowed
-            ? $"El lector {Enc(readerName)} devolvió una credencial válida para {Enc(member?.Name ?? "miembro")}."
-            : $"El lector {Enc(readerName)} devolvió una credencial que no coincide con ningún socio activo.") + "</p></div>" +
+            ? $"El lector {Enc(readerName)} devolvio una credencial valida para {Enc(member?.Name ?? "miembro")}."
+            : $"El lector {Enc(readerName)} devolvio una credencial que no coincide con ningun socio activo.") + "</p></div>" +
         "</section>";
 
     return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), repo.GetAll(), false)), "text/html");
 });
 
-app.MapGet("/billing", (IMemberRepository members, IPaymentRepository payments, BillingService billingService) =>
+app.MapGet("/billing", (HttpRequest request, IMemberRepository members, IPaymentRepository payments, IBillingService billingService) =>
 {
     var allMembers = members.GetAll().OrderBy(member => member.Name).ToList();
     var allPayments = payments.GetAll().OrderByDescending(payment => payment.Date).ToList();
@@ -153,62 +156,121 @@ app.MapGet("/billing", (IMemberRepository members, IPaymentRepository payments, 
 
     foreach (var member in allMembers)
     {
-        memberRows.Append("<tr>");
+        var planType = member.MembershipPlan.GetType().Name;
+        var statusBadge = member.IsOverdue
+            ? "<span class=\"badge danger\">Vencido</span>"
+            : "<span class=\"badge success\">Activo</span>";
+        var rowClass = member.IsOverdue ? "member-row row-overdue" : "member-row";
+
+        memberRows.Append("<tr class=\"" + rowClass + "\" data-id=\"" + Enc(member.Id) + "\" data-name=\"" + Enc(member.Name.ToLowerInvariant()) + "\" data-plan=\"" + planType + "\" data-status=\"" + (member.IsOverdue ? "overdue" : "active") + "\" data-expiration=\"" + member.ExpirationDate.ToString("yyyy-MM-dd") + "\" onclick=\"selectMember('" + Enc(member.Id) + "')\">");
         memberRows.Append($"<td><strong>{Enc(member.Id)}</strong></td>");
         memberRows.Append($"<td>{Enc(member.Name)}</td>");
         memberRows.Append($"<td>{PlanDisplayName(member.MembershipPlan)}</td>");
+        memberRows.Append($"<td>{statusBadge}</td>");
+        memberRows.Append($"<td>{member.ExpirationDate:dd/MM/yyyy}</td>");
         memberRows.Append($"<td>{Money(billingService.CalculateMonthlyFee(member))}</td>");
         memberRows.Append("</tr>");
     }
 
+    if (memberRows.Length == 0)
+    {
+        memberRows.Append("<tr><td colspan=\"6\" class=\"empty-state\">No hay miembros registrados.</td></tr>");
+    }
+
     foreach (var payment in allPayments)
     {
+        var lateFeeText = payment.LateFee > 0 ? Money(payment.LateFee) : "-";
+        var receipt = Enc(payment.ReceiptNumber);
+        var downloadLink = $"<a class=\"link-download\" href=\"/billing/receipt/{receipt}\" target=\"_blank\">Descargar PDF</a>";
+
         paymentRows.Append("<tr>");
         paymentRows.Append($"<td>{payment.Date:dd/MM/yyyy HH:mm}</td>");
         paymentRows.Append($"<td>{Enc(payment.MemberName)}</td>");
         paymentRows.Append($"<td>{Enc(payment.PlanName)}</td>");
+        paymentRows.Append($"<td>{Money(payment.BaseAmount)}</td>");
+        paymentRows.Append($"<td>{lateFeeText}</td>");
         paymentRows.Append($"<td>{Money(payment.Amount)}</td>");
+        paymentRows.Append($"<td>{Enc(payment.PaymentMethod)}</td>");
+        paymentRows.Append($"<td>{receipt}</td>");
+        paymentRows.Append($"<td>{downloadLink}</td>");
         paymentRows.Append("</tr>");
     }
 
     if (paymentRows.Length == 0)
     {
-        paymentRows.Append("<tr><td colspan=\"4\" class=\"empty-state\">Todavía no hay pagos registrados.</td></tr>");
+        paymentRows.Append("<tr><td colspan=\"9\" class=\"empty-state\">Todavia no hay pagos registrados.</td></tr>");
     }
 
+    var banner = BillingBanner(request);
+    var filterBar =
+        "<div class=\"filter-bar\">" +
+        "<input type=\"text\" id=\"filterText\" placeholder=\"Buscar por ID o nombre...\" oninput=\"filterMembers()\" />" +
+        "<select id=\"filterPlan\" onchange=\"filterMembers()\">" +
+        "<option value=\"\">Todos los planes</option>" +
+        "<option value=\"StudentMembership\">Estudiante</option>" +
+        "<option value=\"RegularMembership\">Regular</option>" +
+        "<option value=\"VipMembership\">VIP</option>" +
+        "<option value=\"WeekendMembership\">Fin de semana</option>" +
+        "</select>" +
+        "<select id=\"filterStatus\" onchange=\"filterMembers()\">" +
+        "<option value=\"\">Todos los estados</option>" +
+        "<option value=\"active\">Activo</option>" +
+        "<option value=\"overdue\">Vencido</option>" +
+        "</select>" +
+        "<label class=\"filter-date\">Vence desde<input type=\"date\" id=\"filterFrom\" onchange=\"filterMembers()\" /></label>" +
+        "<label class=\"filter-date\">Vence hasta<input type=\"date\" id=\"filterTo\" onchange=\"filterMembers()\" /></label>" +
+        "<button type=\"button\" class=\"button-secondary\" onclick=\"clearMemberFilters()\">Limpiar filtros</button>" +
+        "</div>";
+
     var content =
-        "<section class=\"page-heading\"><span class=\"eyebrow\">Facturación</span><h2>Pagos y reportes</h2><p>Revisa cuotas mensuales, registra pagos y consulta el historial financiero.</p></section>" +
+        "<section class=\"page-heading\"><span class=\"eyebrow\">Facturacion</span><h2>Pagos y reportes</h2><p>Revisa cuotas mensuales, registra pagos y consulta el historial financiero.</p></section>" +
+        banner +
         "<section class=\"stats-grid compact\">" +
         StatCard("Miembros", allMembers.Count.ToString(), "Con plan vigente") +
         StatCard("Pagos", allPayments.Count.ToString(), "Transacciones guardadas") +
         StatCard("Total cobrado", Money(allPayments.Sum(payment => payment.Amount)), "Ingresos registrados") +
         "</section>" +
         "<section class=\"content-grid two-columns\">" +
-        "<article class=\"panel wide\"><h3>Miembros y tarifa mensual</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Cuota</th></tr></thead><tbody>" + memberRows + "</tbody></table></div></article>" +
-        "<article class=\"panel\"><h3>Registrar pago</h3><form class=\"stacked-form\" method=\"post\" action=\"/billing/pay\"><label>ID del miembro<input name=\"memberId\" required placeholder=\"Ej. A100\" /></label><button type=\"submit\">Registrar pago</button></form></article>" +
+        "<article class=\"panel wide\"><h3>Miembros, estado y tarifa mensual</h3>" +
+        filterBar +
+        "<div class=\"table-wrap\"><table class=\"data-table\" id=\"membersTable\"><thead><tr><th>ID</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Vence</th><th>Cuota a pagar</th></tr></thead><tbody>" + memberRows + "</tbody></table></div>" +
+        "<p id=\"noResults\" class=\"no-results\" style=\"display:none;\">No hay miembros que coincidan con los filtros.</p></article>" +
+        "<article class=\"panel\"><h3>Registrar pago</h3><form class=\"stacked-form\" method=\"post\" action=\"/billing/pay\">" +
+        "<label>ID del miembro<input id=\"memberIdInput\" name=\"memberId\" required placeholder=\"Ej. A100\" /></label>" +
+        "<label>Tipo de pago<select name=\"paymentMethod\"><option value=\"Efectivo\">Efectivo</option><option value=\"Tarjeta\">Tarjeta</option><option value=\"Billetera digital\">Billetera digital</option></select></label>" +
+        "<button type=\"submit\">Registrar pago</button></form></article>" +
         "</section>" +
-        "<section class=\"panel\"><h3>Historial de pagos</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Plan</th><th>Importe</th></tr></thead><tbody>" + paymentRows + "</tbody></table></div></section>";
+        "<section class=\"panel\"><h3>Historial de pagos</h3><div class=\"table-wrap\"><table class=\"data-table payment-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Plan</th><th>Cuota</th><th>Mora</th><th>Total</th><th>Tipo de pago</th><th>Comprobante</th><th>Descarga</th></tr></thead><tbody>" + paymentRows + "</tbody></table></div></section>" +
+        BillingScripts();
 
-    return Results.Content(PageLayout("Facturación y reportes", "billing", content), "text/html");
+    return Results.Content(PageLayout("Facturacion y reportes", "billing", content), "text/html");
 });
 
-app.MapGet("/access/qr", (string presentedData) =>
-{
-    return Results.Redirect($"/access?presentedData={Uri.EscapeDataString(presentedData)}&scanner=qr");
-});
-
-app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository members, BillingService billingService) =>
+app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository members, IBillingService billingService) =>
 {
     var form = await request.ReadFormAsync();
     var memberId = form["memberId"].ToString();
+    var paymentMethod = form["paymentMethod"].ToString();
     var member = members.GetAll().FirstOrDefault(m => m.Id.Equals(memberId, StringComparison.OrdinalIgnoreCase));
     if (member is null)
     {
-        return Results.Redirect("/billing");
+        return Results.Redirect("/billing?status=notfound");
     }
 
-    billingService.RegisterMonthlyPayment(member);
-    return Results.Redirect("/billing");
+    var receipt = billingService.RegisterMonthlyPayment(member, paymentMethod);
+    return Results.Redirect($"/billing?status=ok&amount={receipt.Amount:0.00}&receipt={Uri.EscapeDataString(receipt.ReceiptNumber)}");
+});
+
+app.MapGet("/billing/receipt/{receiptNumber}", (string receiptNumber, IPaymentRepository payments, IReceiptPdfGenerator receiptPdfGenerator) =>
+{
+    var payment = payments.GetByReceiptNumber(receiptNumber);
+    if (payment is null)
+    {
+        return Results.NotFound("No se encontro ningun comprobante con ese numero.");
+    }
+
+    var pdfBytes = receiptPdfGenerator.Generate(payment);
+    return Results.File(pdfBytes, "application/pdf", $"comprobante-{payment.ReceiptNumber}.pdf");
 });
 
 app.Run();
@@ -244,22 +306,85 @@ static string RenderAccessPage(IEnumerable<AccessLog> logs, IEnumerable<Member> 
 
     if (rows.Length == 0)
     {
-        rows.Append("<tr><td colspan=\"4\" class=\"empty-state\">Aún no hay validaciones registradas.</td></tr>");
+        rows.Append("<tr><td colspan=\"4\" class=\"empty-state\">Aun no hay validaciones registradas.</td></tr>");
     }
 
     var heading = includeHeading
-        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validación de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
+        ? "<section class=\"page-heading\"><span class=\"eyebrow\">Acceso</span><h2>Validacion de acceso</h2><p>Panel para acceso mediante QR o lector biometrico de huella.</p></section>"
         : string.Empty;
 
     return heading +
         "<section class=\"content-grid two-columns\">" +
         "<article class=\"panel\"><h3>Simular lectura</h3><form class=\"stacked-form\" method=\"post\" action=\"/access\">" +
         "<label>Salida del lector<input name=\"readerOutput\" required placeholder=\"Ej. A100 o FP-A100\" /></label>" +
-        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Cámara / lector QR</option><option value=\"fingerprint\">Lector biométrico de huella</option></select></label>" +
+        "<label>Dispositivo simulado<select name=\"readerType\"><option value=\"qr\">Camara / lector QR</option><option value=\"fingerprint\">Lector biometrico de huella</option></select></label>" +
         "<button type=\"submit\">Validar acceso</button></form></article>" +
         "<article class=\"panel wide\"><h3>Credenciales simuladas</h3><div class=\"table-wrap\"><table class=\"data-table compact-table\"><thead><tr><th>Socio</th><th>Salida QR</th><th>Salida huella</th></tr></thead><tbody>" + exampleRows + "</tbody></table></div></article>" +
         "</section>" +
         "<section class=\"panel\"><h3>Historial reciente</h3><div class=\"table-wrap\"><table class=\"data-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Lector</th><th>Estado</th></tr></thead><tbody>" + rows + "</tbody></table></div></section>";
+}
+
+static string BillingBanner(HttpRequest request)
+{
+    var status = request.Query["status"].ToString();
+    if (status == "ok")
+    {
+        var amount = Enc(request.Query["amount"].ToString());
+        var receipt = Enc(request.Query["receipt"].ToString());
+        return $"<section class=\"info-box\"><strong>Pago registrado correctamente.</strong> Comprobante {receipt} por S/{amount}. La membresia fue renovada. <a class=\"link-download\" href=\"/billing/receipt/{receipt}\" target=\"_blank\">Descargar comprobante en PDF</a></section>";
+    }
+
+    if (status == "notfound")
+    {
+        return "<section class=\"info-box danger-box\"><strong>No se encontro ningun miembro con ese ID.</strong> Verifica el dato e intentalo nuevamente.</section>";
+    }
+
+    return string.Empty;
+}
+
+static string BillingScripts()
+{
+    return """
+        <script>
+        function selectMember(id){
+            document.getElementById('memberIdInput').value=id;
+            document.getElementById('memberIdInput').scrollIntoView({behavior:'smooth',block:'center'});
+        }
+        function filterMembers(){
+            var text=document.getElementById('filterText').value.trim().toLowerCase();
+            var plan=document.getElementById('filterPlan').value;
+            var status=document.getElementById('filterStatus').value;
+            var from=document.getElementById('filterFrom').value;
+            var to=document.getElementById('filterTo').value;
+            var rows=document.querySelectorAll('#membersTable .member-row');
+            var visibleCount=0;
+            rows.forEach(function(row){
+                var id=row.dataset.id.toLowerCase();
+                var name=row.dataset.name;
+                var rowPlan=row.dataset.plan;
+                var rowStatus=row.dataset.status;
+                var exp=row.dataset.expiration;
+                var visible=true;
+                if(text && id.indexOf(text)===-1 && name.indexOf(text)===-1){visible=false;}
+                if(plan && rowPlan!==plan){visible=false;}
+                if(status && rowStatus!==status){visible=false;}
+                if(from && exp<from){visible=false;}
+                if(to && exp>to){visible=false;}
+                row.style.display=visible?'':'none';
+                if(visible){visibleCount++;}
+            });
+            document.getElementById('noResults').style.display=visibleCount===0?'':'none';
+        }
+        function clearMemberFilters(){
+            document.getElementById('filterText').value='';
+            document.getElementById('filterPlan').value='';
+            document.getElementById('filterStatus').value='';
+            document.getElementById('filterFrom').value='';
+            document.getElementById('filterTo').value='';
+            filterMembers();
+        }
+        </script>
+        """;
 }
 
 static string PageLayout(string title, string activeSection, string content)
@@ -268,14 +393,14 @@ static string PageLayout(string title, string activeSection, string content)
         NavLink("/", "Inicio", activeSection == "home") +
         NavLink("/members", "Miembros", activeSection == "members") +
         NavLink("/access", "Acceso", activeSection == "access") +
-        NavLink("/billing", "Facturación", activeSection == "billing");
+        NavLink("/billing", "Facturacion", activeSection == "billing");
 
     return "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
         $"<title>{Enc(title)} | Gimnasio SOLID</title><style>{CssStyles()}</style></head>" +
         "<body><div class=\"app-shell\"><header><div class=\"topbar\">" +
         "<a class=\"brand\" href=\"/\"><span class=\"brand-mark\">GS</span><span><strong>Gimnasio SOLID</strong><span>Control operativo</span></span></a>" +
-        $"<nav aria-label=\"Navegación principal\">{navigation}</nav></div></header><main>{content}</main></div></body></html>";
+        $"<nav aria-label=\"Navegacion principal\">{navigation}</nav></div></header><main>{content}</main></div></body></html>";
 }
 
 static string CssStyles()
@@ -409,7 +534,8 @@ static string CssStyles()
         }
 
         .hero-actions,
-        .quick-actions {
+        .quick-actions,
+        .filter-bar {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -445,6 +571,13 @@ static string CssStyles()
             color: #fff;
             border: 1px solid rgba(255, 255, 255, .35);
         }
+
+        .button-secondary {
+            background: #e2e8f0;
+            color: var(--ink);
+        }
+
+        .button-secondary:hover { background: #cbd5e1; }
 
         .page-heading { padding: 16px 0 8px; }
         .page-heading h2 { color: var(--ink); }
@@ -504,8 +637,10 @@ static string CssStyles()
         .panel {
             padding: 22px;
             overflow: hidden;
+            margin-top: 18px;
         }
 
+        .content-grid .panel { margin-top: 0; }
         .panel.wide { min-width: 0; }
 
         .panel-title {
@@ -530,18 +665,6 @@ static string CssStyles()
             gap: 10px;
             color: var(--muted);
             font-weight: 700;
-        }
-
-        .simulation-note {
-            margin-top: 18px;
-            border-left: 5px solid var(--accent);
-            background: #fffaf1;
-        }
-
-        .simulation-note p {
-            margin: 0;
-            color: var(--muted);
-            line-height: 1.65;
         }
 
         .stacked-form {
@@ -575,6 +698,21 @@ static string CssStyles()
             border-color: var(--brand);
         }
 
+        .filter-bar {
+            align-items: end;
+            margin-bottom: 14px;
+        }
+
+        .filter-bar input,
+        .filter-bar select,
+        .filter-date {
+            flex: 1 1 150px;
+        }
+
+        .filter-date {
+            min-width: 150px;
+        }
+
         .table-wrap {
             overflow-x: auto;
             border: 1px solid var(--line);
@@ -583,14 +721,13 @@ static string CssStyles()
 
         .data-table {
             width: 100%;
-            min-width: 620px;
+            min-width: 720px;
             border-collapse: collapse;
             font-size: .94rem;
         }
 
-        .compact-table {
-            min-width: 480px;
-        }
+        .payment-table { min-width: 980px; }
+        .compact-table { min-width: 480px; }
 
         .data-table th,
         .data-table td {
@@ -607,6 +744,10 @@ static string CssStyles()
         }
 
         .data-table tr:last-child td { border-bottom: 0; }
+        .member-row { cursor: pointer; }
+        .member-row:hover { background: #eef6f2; }
+        .row-overdue { background: #fff4f2; }
+        .row-overdue td { color: #7a271a; }
 
         code {
             display: inline-flex;
@@ -641,6 +782,36 @@ static string CssStyles()
         .badge.danger {
             background: #fdeceb;
             color: var(--danger);
+        }
+
+        .info-box {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border-radius: 8px;
+            border: 1px solid #bddfd0;
+            background: #eef8f3;
+            color: var(--brand-dark);
+            line-height: 1.55;
+        }
+
+        .danger-box {
+            border-color: #fac5bd;
+            background: #fff4f2;
+            color: var(--danger);
+        }
+
+        .link-download {
+            color: var(--brand-dark);
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .link-download:hover { text-decoration: underline; }
+
+        .no-results {
+            color: var(--muted);
+            font-style: italic;
+            margin: 12px 0 0;
         }
 
         .result-panel {
@@ -716,7 +887,7 @@ static string CssStyles()
 
 static string NavLink(string href, string text, bool active)
 {
-    return $"<a class=\"{(active ? "active" : string.Empty)}\" href=\"{href}\">{text}</a>";
+    return $"<a class=\"{(active ? "active" : string.Empty)}\" href=\"{href}\">{Enc(text)}</a>";
 }
 
 static string StatCard(string label, string value, string description)

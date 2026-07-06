@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using GimnasioSolid.Models;
 
 namespace GimnasioSolid.Repositories
@@ -18,5 +20,10 @@ namespace GimnasioSolid.Repositories
         }
 
         public IEnumerable<PaymentRecord> GetAll() => _payments.AsReadOnly();
+
+        public PaymentRecord? GetByReceiptNumber(string receiptNumber)
+        {
+            return _payments.FirstOrDefault(p => p.ReceiptNumber.Equals(receiptNumber, StringComparison.OrdinalIgnoreCase));
+        }
     }
 }
