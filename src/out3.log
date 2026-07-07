@@ -1,0 +1,40 @@
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[63]
+      User profile is available. Using 'C:\Users\Usuario\AppData\Local\ASP.NET\DataProtection-Keys' as key repository and Windows DPAPI to encrypt keys at rest.
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[58]
+      Creating key {f08cf438-f155-4996-ae61-06e6980f32e5} with creation date 2026-07-07 05:10:05Z, activation date 2026-07-07 05:10:05Z, and expiration date 2026-10-05 05:10:05Z.
+info: Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository[39]
+      Writing data to file 'C:\Users\Usuario\AppData\Local\ASP.NET\DataProtection-Keys\key-f08cf438-f155-4996-ae61-06e6980f32e5.xml'.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5051
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Usuario\gimnasio_solid\src
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5051/ - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: GET /'
+info: Microsoft.AspNetCore.Http.Result.RedirectResult[1]
+      Executing RedirectResult, redirecting to /login.
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: GET /'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5051/ - 302 0 - 186.8041ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5051/login - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: GET /login'
+info: Microsoft.AspNetCore.Http.Result.ContentResult[2]
+      Write content with HTTP Response ContentType of text/html
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: GET /login'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5051/login - 200 9343 text/html 3.4098ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost:5051/favicon.ico - - -
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost:5051/favicon.ico - 404 0 - 29.3395ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[16]
+      Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5051/favicon.ico, Response status code: 404

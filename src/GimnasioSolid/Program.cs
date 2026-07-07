@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using GimnasioSolid.Controllers;
 using GimnasioSolid.Memberships;
@@ -13,6 +13,14 @@ QuestPDF.Settings.License = LicenseType.Community;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(2);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IMemberRepository, MemberRepository>();
 builder.Services.AddSingleton<IPaymentRepository, PaymentRepository>();
 builder.Services.AddSingleton<IAccessLogRepository, AccessLogRepository>();
@@ -28,13 +36,21 @@ builder.Services.AddScoped<IReportService, CsvReportService>();
 
 var app = builder.Build();
 
+app.UseSession();
+
 app.MapControllers();
 
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 SeedUsers(app.Services.GetRequiredService<IUserRepository>(), app.Services.GetRequiredService<AuthenticationService>());
 
-app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccessLogRepository accessLogs, IBillingService billingService) =>
+app.MapGet("/", (HttpContext httpContext, IMemberRepository members, IPaymentRepository payments, IAccessLogRepository accessLogs, IBillingService billingService) =>
 {
+    var sessionUsername = httpContext.Session.GetString("username");
+    if (string.IsNullOrEmpty(sessionUsername))
+    {
+        return Results.Redirect("/login");
+    }
+
     var allMembers = members.GetAll().ToList();
     var totalRevenue = payments.GetAll().Sum(payment => payment.Amount);
     var monthlyProjection = allMembers.Sum(member => billingService.CalculateMonthlyFee(member));
@@ -56,7 +72,7 @@ app.MapGet("/", (IMemberRepository members, IPaymentRepository payments, IAccess
         "<article class=\"panel\"><h3>Reportes</h3><div class=\"quick-actions\"><a href=\"/api/reportsandalerts/alerts\" target=\"_blank\">Ver alertas</a><a href=\"/api/reportsandalerts/download-csv\">Reporte CSV</a></div></article>" +
         "</section>";
 
-    return Results.Content(PageLayout("Panel principal", "home", content), "text/html");
+    return Results.Content(PageLayout("Panel principal", "home", content, sessionUsername), "text/html");
 });
 
 app.MapGet("/login", () =>
@@ -69,10 +85,10 @@ app.MapGet("/login", () =>
         "<button type=\"submit\">Ingresar</button></form></article>" +
         "<article class=\"panel\"><h3>Nuevo usuario</h3><p class=\"muted-copy\">Registra una cuenta para operar el sistema con un rol definido.</p><div class=\"quick-actions\"><a href=\"/register\">Crear cuenta</a></div></article></section>";
 
-    return Results.Content(PageLayout("Login", "login", content), "text/html");
+    return Results.Content(PageLayout("Login", "login", content, sessionUsername: null), "text/html");
 });
 
-app.MapPost("/login", async (HttpRequest request, LoginController loginController) =>
+app.MapPost("/login", async (HttpRequest request, HttpContext httpContext, LoginController loginController) =>
 {
     var form = await request.ReadFormAsync();
     var username = form["username"].ToString();
@@ -82,11 +98,12 @@ app.MapPost("/login", async (HttpRequest request, LoginController loginControlle
     if (user is null)
     {
         var errorContent = "<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Error de login</h2><p>Usuario o contraseña incorrectos.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Volver a intentar</a></div>";
-        return Results.Content(PageLayout("Error de Login", "login", errorContent), "text/html");
+        return Results.Content(PageLayout("Error de Login", "login", errorContent, sessionUsername: null), "text/html");
     }
 
-    var successContent = $"<section class=\"result-panel allowed\"><span class=\"status-dot\"></span><div><h2>Bienvenido, {Enc(user.Username)}</h2><p>Tu rol es: <strong>{Enc(user.Role.ToString())}</strong>.</p></div></section><div class=\"quick-actions\"><a href=\"/\">Ir al panel principal</a></div>";
-    return Results.Content(PageLayout("Login exitoso", "login", successContent), "text/html");
+    httpContext.Session.SetString("username", user.Username);
+    httpContext.Session.SetString("role", user.Role.ToString());
+    return Results.Redirect("/");
 });
 
 app.MapGet("/register", () =>
@@ -101,10 +118,10 @@ app.MapGet("/register", () =>
         "<label>Rol<select name=\"role\"><option value=\"Member\">Miembro</option><option value=\"Staff\">Personal</option><option value=\"Manager\">Gerente</option><option value=\"Admin\">Administrador</option></select></label>" +
         "<button type=\"submit\">Registrarse</button></form></section>";
 
-    return Results.Content(PageLayout("Registrarse", "login", content), "text/html");
+    return Results.Content(PageLayout("Registrarse", "login", content, sessionUsername: null), "text/html");
 });
 
-app.MapPost("/register", async (HttpRequest request, LoginController loginController) =>
+app.MapPost("/register", async (HttpRequest request, HttpContext httpContext, LoginController loginController) =>
 {
     var form = await request.ReadFormAsync();
     var id = form["id"].ToString();
@@ -122,17 +139,29 @@ app.MapPost("/register", async (HttpRequest request, LoginController loginContro
     {
         loginController.Register(id, username, email, password, role);
         var successContent = $"<section class=\"result-panel allowed\"><span class=\"status-dot\"></span><div><h2>Registro exitoso</h2><p>Cuenta creada para <strong>{Enc(username)}</strong>.</p></div></section><div class=\"quick-actions\"><a href=\"/login\">Iniciar sesión</a></div>";
-        return Results.Content(PageLayout("Registro completado", "login", successContent), "text/html");
+        return Results.Content(PageLayout("Registro completado", "login", successContent, sessionUsername: null), "text/html");
     }
     catch (InvalidOperationException ex)
     {
         var errorContent = $"<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Error en el registro</h2><p>{Enc(ex.Message)}</p></div></section><div class=\"quick-actions\"><a href=\"/register\">Intentar de nuevo</a></div>";
-        return Results.Content(PageLayout("Error de Registro", "login", errorContent), "text/html");
+        return Results.Content(PageLayout("Error de Registro", "login", errorContent, sessionUsername: null), "text/html");
     }
 });
 
-app.MapGet("/members", (IMemberRepository repository, string? query) =>
+app.MapGet("/logout", (HttpContext httpContext) =>
 {
+    httpContext.Session.Clear();
+    return Results.Redirect("/login");
+});
+
+app.MapGet("/members", (HttpContext httpContext, IMemberRepository repository, string? query) =>
+{
+    var sessionUsername = httpContext.Session.GetString("username");
+    if (string.IsNullOrEmpty(sessionUsername))
+    {
+        return Results.Redirect("/login");
+    }
+    _ = sessionUsername;
     var filteredMembers = string.IsNullOrWhiteSpace(query)
         ? repository.GetAll()
         : repository.GetAll().Where(member =>
@@ -182,7 +211,7 @@ app.MapGet("/members", (IMemberRepository repository, string? query) =>
         "<button type=\"submit\">Agregar miembro</button></form></article>" +
         "</section>";
 
-    return Results.Content(PageLayout("Gestion de miembros", "members", content), "text/html");
+        return Results.Content(PageLayout("Gestion de miembros", "members", content, sessionUsername),"text/html");
 });
 
 app.MapPost("/members", async (HttpRequest request, IMemberRepository repository) =>
@@ -207,7 +236,7 @@ app.MapGet("/members/edit/{id}", (string id, IMemberRepository repository) =>
         var notFoundContent =
             "<section class=\"result-panel denied\"><span class=\"status-dot\"></span><div><h2>Miembro no encontrado</h2><p>Verifica el ID e intentalo nuevamente.</p></div></section>" +
             "<div class=\"quick-actions\"><a href=\"/members\">Volver a miembros</a></div>";
-        return Results.Content(PageLayout("Miembro no encontrado", "members", notFoundContent), "text/html");
+        return Results.Content(PageLayout("Miembro no encontrado", "members", notFoundContent, sessionUsername: null), "text/html");
     }
 
     var content =
@@ -221,7 +250,7 @@ app.MapGet("/members/edit/{id}", (string id, IMemberRepository repository) =>
         "<div class=\"quick-actions\"><button type=\"submit\">Guardar cambios</button><a href=\"/members\">Cancelar</a></div>" +
         "</form></section>";
 
-    return Results.Content(PageLayout("Editar miembro", "members", content), "text/html");
+    return Results.Content(PageLayout("Editar miembro", "members", content, sessionUsername: null), "text/html");
 });
 
 app.MapPost("/members/update", async (HttpRequest request, IMemberRepository repository) =>
@@ -252,13 +281,15 @@ app.MapPost("/members/delete", async (HttpRequest request, IMemberRepository rep
     return Results.Redirect("/members");
 });
 
-app.MapGet("/access", (IMemberRepository members, IAccessLogRepository accessLogs) =>
+app.MapGet("/access", (HttpContext httpContext, IMemberRepository members, IAccessLogRepository accessLogs) =>
 {
-    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll())), "text/html");
+    var sessionUsername = httpContext.Session.GetString("username");
+    return Results.Content(PageLayout("Validación de acceso", "access", RenderAccessPage(accessLogs.GetAll(), members.GetAll()), sessionUsername), "text/html");
 });
 
-app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
+app.MapPost("/access", async (HttpRequest request, HttpContext httpContext, AccessControl accessControl, IMemberRepository repo, IAccessLogRepository accessLogs) =>
 {
+    var sessionUsername = httpContext.Session.GetString("username");
     var form = await request.ReadFormAsync();
     var readerOutput = form["readerOutput"].ToString();
     var readerType = form["readerType"].ToString();
@@ -288,11 +319,12 @@ app.MapPost("/access", async (HttpRequest request, AccessControl accessControl, 
             : $"El lector {Enc(readerName)} devolvio una credencial que no coincide con ningun socio activo.") + "</p></div>" +
         "</section>";
 
-    return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), repo.GetAll(), false)), "text/html");
+    return Results.Content(PageLayout("Resultado de acceso", "access", result + RenderAccessPage(accessLogs.GetAll(), repo.GetAll(), false), sessionUsername), "text/html");
 });
 
-app.MapGet("/billing", (HttpRequest request, IMemberRepository members, IPaymentRepository payments, IBillingService billingService) =>
+app.MapGet("/billing", (HttpContext httpContext, HttpRequest request, IMemberRepository members, IPaymentRepository payments, IBillingService billingService) =>
 {
+    var sessionUsername = httpContext.Session.GetString("username");
     var allMembers = members.GetAll().OrderBy(member => member.Name).ToList();
     var allPayments = payments.GetAll().OrderByDescending(payment => payment.Date).ToList();
     var memberRows = new StringBuilder();
@@ -377,7 +409,8 @@ app.MapGet("/billing", (HttpRequest request, IMemberRepository members, IPayment
         "<section class=\"panel\"><h3>Historial de pagos</h3><div class=\"table-wrap\"><table class=\"data-table payment-table\"><thead><tr><th>Fecha</th><th>Miembro</th><th>Plan</th><th>Cuota</th><th>Mora</th><th>Total</th><th>Tipo de pago</th><th>Comprobante</th><th>Descarga</th></tr></thead><tbody>" + paymentRows + "</tbody></table></div></section>" +
         BillingScripts();
 
-    return Results.Content(PageLayout("Facturacion y reportes", "billing", content), "text/html");
+    return Results.Content(
+        PageLayout("Facturacion y reportes", "billing", content, sessionUsername),"text/html");
 });
 
 app.MapPost("/billing/pay", async (HttpRequest request, IMemberRepository members, IBillingService billingService) =>
@@ -518,27 +551,49 @@ static string BillingScripts()
         """;
 }
 
-static string PageLayout(string title, string activeSection, string content)
+static string PageLayout(string title, string activeSection, string content, string? sessionUsername)
 {
-    var navigation =
-        NavLink("/", "Inicio", activeSection == "home") +
-        NavLink("/members", "Miembros", activeSection == "members") +
-        NavLink("/access", "Acceso", activeSection == "access") +
-        NavLink("/billing", "Facturación", activeSection == "billing") +
-        NavLink("/login", "Login", activeSection == "login");
+    string navigation = "";
+
+    if (!string.IsNullOrEmpty(sessionUsername))
+    {
+        navigation =
+            NavLink("/", "Inicio", activeSection == "home") +
+            NavLink("/members", "Miembros", activeSection == "members") +
+            NavLink("/access", "Acceso", activeSection == "access") +
+            NavLink("/billing", "Facturación", activeSection == "billing");
+    }
+    else
+    {
+        navigation = "";
+    }
+    string userBox;
+    if (!string.IsNullOrEmpty(sessionUsername))
+    {
+        userBox = $"<div class=\"user-box\"><span class=\"user-greeting\">Bienvenido, <strong>{Enc(sessionUsername)}</strong></span><a class=\"logout-link\" href=\"/logout\">Cerrar sesión</a></div>";
+    }
+    else
+    {
+        userBox = NavLink("/login", "Login", activeSection == "login");
+    }
 
     return "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
         $"<title>{Enc(title)} | Gimnasio SOLID</title><style>{CssStyles()}</style></head>" +
         "<body><div class=\"app-shell\"><header><div class=\"topbar\">" +
         "<a class=\"brand\" href=\"/\"><span class=\"brand-mark\">GS</span><span><strong>DeporVida SOLID</strong><span>Control operativo</span></span></a>" +
-        $"<nav aria-label=\"Navegacion principal\">{navigation}</nav></div></header><main>{content}</main></div></body></html>";
+        $"<nav aria-label=\"Navegacion principal\">{navigation}</nav>{userBox}</div></header><main>{content}</main></div></body></html>";
 }
 
 static string CssStyles()
 {
     return """
         :root { color-scheme: light; --ink:#172033; --muted:#647084; --line:#dfe6f0; --surface:#fff; --surface-soft:#f6f8fb; --brand:#116149; --brand-dark:#0b4635; --accent:#d88b18; --danger:#b42318; --success:#138a54; --shadow:0 18px 38px rgba(23,32,51,.08); }
+        .user-box { display:flex; align-items:center; gap:10px; padding:8px 14px; background:#eaf4ef; border-radius:10px; }
+        .user-greeting { color:var(--brand-dark); font-weight:700; font-size:.92rem; }
+        .logout-link { color:var(--danger); font-weight:800; font-size:.85rem; text-decoration:none; padding:6px 10px; border-radius:8px; }
+        .logout-link:hover { background:#fdeceb; }
+        @media (max-width:900px) { .user-box { width:100%; justify-content:space-between; } }
         * { box-sizing: border-box; }
         body { margin:0; min-height:100vh; font-family:Inter,"Segoe UI",Arial,sans-serif; background:var(--surface-soft); color:var(--ink); }
         a { color: inherit; }
