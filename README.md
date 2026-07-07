@@ -1,4 +1,4 @@
-# Gimnasio SOLID
+# DeporVida Fitness SOLID
 
 Aplicación web desarrollada en C# y .NET 8 para gestionar miembros, planes de
 membresía, validación de accesos mediante QR o huella y registro de pagos.
