@@ -21,7 +21,7 @@ var app = builder.Build();
 SeedMembers(app.Services.GetRequiredService<IMemberRepository>());
 SeedUsers(app.Services.GetRequiredService<IUserRepository>(), app.Services.GetRequiredService<AuthenticationService>());
 
-app.MapGet("/login", () => Results.Content(PageLayout("Login", "", "<h2>Iniciar sesión</h2><section class=\"card\"><form method=\"post\" action=\"/login\"><label>Usuario:<input name=\"username\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><button type=\"submit\">Ingresar</button></form><p><a href=\"/register\">¿No tienes cuenta? Regístrate aquí</a></p></section>"), "text/html"));
+app.MapGet("/login", () => Results.Content(PageLayout("Login", "", "<h2>Iniciar sesión</h2><section class=\"card\"><form method=\"post\" action=\"/login\"><label>Usuario:<input name=\"username\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><button type=\"submit\">Ingresar</button></form><p><a href=\"/register\">¿No tienes cuenta? Regístrate aquí</a></p><p><a href=\"/\">Volver atrás</a></p></section>"), "text/html"));
 
 app.MapPost("/login", async (HttpRequest request, LoginController loginController) =>
 {
@@ -40,7 +40,7 @@ app.MapPost("/login", async (HttpRequest request, LoginController loginControlle
     return Results.Content(PageLayout("Login exitoso", "", successContent), "text/html");
 });
 
-app.MapGet("/register", () => Results.Content(PageLayout("Registrarse", "", "<h2>Crear nueva cuenta</h2><section class=\"card\"><form method=\"post\" action=\"/register\"><label>ID:<input name=\"id\" required /></label><label>Usuario:<input name=\"username\" required /></label><label>Email:<input name=\"email\" type=\"email\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><label>Rol:<select name=\"role\"><option value=\"Member\">Miembro</option><option value=\"Staff\">Personal</option><option value=\"Manager\">Gerente</option><option value=\"Admin\">Administrador</option></select></label><button type=\"submit\">Registrarse</button></form><p><a href=\"/login\">¿Ya tienes cuenta? Inicia sesión</a></p></section>"), "text/html"));
+app.MapGet("/register", () => Results.Content(PageLayout("Registrarse", "", "<h2>Crear nueva cuenta</h2><section class=\"card\"><form method=\"post\" action=\"/register\"><label>ID:<input name=\"id\" required /></label><label>Usuario:<input name=\"username\" required /></label><label>Email:<input name=\"email\" type=\"email\" required /></label><label>Contraseña:<input name=\"password\" type=\"password\" required /></label><label>Rol:<select name=\"role\"><option value=\"Member\">Miembro</option><option value=\"Staff\">Personal</option><option value=\"Manager\">Gerente</option><option value=\"Admin\">Administrador</option></select></label><button type=\"submit\">Registrarse</button></form><p><a href=\"/login\">¿Ya tienes cuenta? Inicia sesión</a></p><p><a href=\"/\">Volver atrás</a></p></section>"), "text/html"));
 
 app.MapPost("/register", async (HttpRequest request, LoginController loginController) =>
 {
