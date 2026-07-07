@@ -59,7 +59,7 @@ app.MapPost("/register", async (HttpRequest request, LoginController loginContro
     try
     {
         loginController.Register(id, username, email, password, role);
-        var successContent = $"<h2>Registro exitoso</h2><p>Cuenta creada para <strong>{username}</strong></p><p><a href=\"/login\">Inicia sesión aquí</a></p>";
+        var successContent = $"<h2>Registro exitoso</h2><p>Cuenta creada para <strong>{username}</strong></p><p>Se ha guardado correctamente.</p><p><a href=\"/login\">Inicia sesión aquí</a></p>";
         return Results.Content(PageLayout("Registro completado", "", successContent), "text/html");
     }
     catch (InvalidOperationException ex)
